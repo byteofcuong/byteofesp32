@@ -1,6 +1,6 @@
 ---
 date: 2026-11-16
-branch: setup/knowledge-base
+branch: main
 commit: 0565c72
 ---
 # Handoff
@@ -10,7 +10,7 @@ Làm trợ lý giọng nói để bàn kiểu Muse Charm trên board ESP32-3248S
 
 ## Trạng thái
 - Xong: AGENTS.md + CLAUDE.md; `docs/hardware/` (pinout, cổng, mic, nguồn, danh sách mua); ADR 0001–0004; `docs/design/assistant.md`; `docs/research/`; `docs/open-questions.md` (Q1–Q10); ontology 23 khái niệm; hook bàn giao chép từ project Black-Room; skill handoff theo mẫu claude-village.
-- Đã commit toàn bộ khung trên nhánh `setup/knowledge-base` (tách từ `main` ở `0565c72`). Chưa merge vào `main`, chưa push. `docs/private/` bị git bỏ qua (repo công khai).
+- Khung đã commit (`9ce7114`), merge fast-forward vào `main` và push lên `origin/main`. Nhánh `setup/knowledge-base` còn ở máy, đã merge, xóa được. `docs/private/` bị git bỏ qua (repo công khai).
 - Chưa có code firmware/server. Chưa mua loa, mic, pin. Chưa cài PlatformIO, esptool.
 
 ## Quyết định
@@ -22,10 +22,9 @@ Làm trợ lý giọng nói để bàn kiểu Muse Charm trên board ESP32-3248S
 - Đã loại: dùng thẻ SD thay RAM; model từ đánh thức trên chip; đăng nhập claude.ai trong server; combo có MAX98357.
 
 ## Việc tiếp theo
-1. Hỏi người dùng có muốn merge `setup/knowledge-base` vào `main` và push lên GitHub không (repo công khai).
-2. Chờ người dùng: ảnh rõ mã chip 8 chân cạnh `2R2` (Q1), đo bước chân BAT1 (Q2), kiểm tra token Muse có API key không (Q6).
-3. Cài esptool (`pip install esptool`), sao lưu flash gốc: `python -m esptool --port COMx read_flash 0 0x400000 cyd_factory_backup.bin`.
-4. Chốt framework firmware (Q9) bằng ADR 0005, dựng project dò pin trong `firmware/`: màn, đèn nền GPIO27, cảm ứng, LED, loa, ADC GPIO34/35.
+1. Chờ người dùng: ảnh rõ mã chip 8 chân cạnh `2R2` (Q1), đo bước chân BAT1 (Q2), kiểm tra token Muse có API key không (Q6).
+2. Cài esptool (`pip install esptool`), sao lưu flash gốc: `python -m esptool --port COMx read_flash 0 0x400000 cyd_factory_backup.bin`.
+3. Chốt framework firmware (Q9) bằng ADR 0005, dựng project dò pin trong `firmware/`: màn, đèn nền GPIO27, cảm ứng, LED, loa, ADC GPIO34/35.
 
 ## Kiểm chứng
 - `python .claude/hooks/test_handoff_hooks.py`: Ran 13 tests, OK.
