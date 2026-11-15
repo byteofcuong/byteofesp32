@@ -1,0 +1,49 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 10,
+            "command": "python -I \"$(git rev-parse --show-toplevel)/.claude/hooks/handoff_session_start.py\""
+          },
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python -I \"$HOME/.claude/skills/ontology/scripts/check_ontology.py\" \"$(git rev-parse --show-toplevel)/.claude/ontology/ontology.json\" --hook"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 15,
+            "command": "python -I \"$(git rev-parse --show-toplevel)/.claude/hooks/handoff_stop.py\""
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 10,
+            "command": "python -I \"$(git rev-parse --show-toplevel)/.claude/hooks/handoff_precompact.py\""
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./server/.env)"
+    ]
+  }
+}

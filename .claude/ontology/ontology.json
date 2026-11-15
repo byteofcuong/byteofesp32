@@ -1,0 +1,304 @@
+{
+  "project": "byteofesp32",
+  "generated": "2026-11-16",
+  "commit": "0565c72",
+  "root": "../..",
+  "classes": [
+    {
+      "id": "Board",
+      "kind": "entity",
+      "area": "hardware",
+      "parent": null,
+      "label": {"en": "Board", "vi": "Bo mạch"},
+      "synonyms": ["ESP32-3248S035R", "ESP32-035 (chữ in)", "CYD 3.5\"", "con mạch"],
+      "definition": "Bo mạch ESP32 classic có màn cảm ứng 3.5\" mà dự án chạy trên đó; không có PSRAM. Khác với CYD 2.8\" (ESP32-2432S028R) dù người bán ghi nhầm như vậy.",
+      "attributes": [
+        {"name": "psram", "type": "bool", "definition": "Có PSRAM hay không; ở board này là không, nên mọi xử lý âm thanh nặng phải đẩy lên server.", "evidence": [{"file": "docs/hardware/esp32-3248s035r.md", "symbol": "**không có PSRAM**"}]}
+      ],
+      "evidence": [{"file": "docs/hardware/esp32-3248s035r.md", "symbol": "# Board: ESP32-3248S035R"}]
+    },
+    {
+      "id": "Connector",
+      "kind": "entity",
+      "area": "hardware",
+      "parent": null,
+      "label": {"en": "Connector", "vi": "Cổng"},
+      "synonyms": ["port", "cổng cắm", "JST 1.25"],
+      "definition": "Một cổng vật lý trên board (USB-C, P1, CN1, P3, BAT1, SPEAK1, TF1), nhận ra bằng chữ in cạnh nó.",
+      "attributes": [
+        {"name": "silkscreen", "type": "str", "definition": "Chữ in trên board cạnh cổng và từng chân; là tên dùng khi hướng dẫn người dùng.", "evidence": [{"file": "docs/hardware/esp32-3248s035r.md", "symbol": "| Cổng | Chữ in | Vai trò | Cách nối |"}]}
+      ],
+      "evidence": [{"file": "docs/hardware/esp32-3248s035r.md", "symbol": "## Cổng"}]
+    },
+    {
+      "id": "GpioPin",
+      "kind": "value",
+      "area": "hardware",
+      "parent": null,
+      "label": {"en": "GPIO pin", "vi": "Chân GPIO"},
+      "synonyms": ["IO21", "GPIO27", "chân"],
+      "definition": "Một chân tín hiệu của ESP32, xác định bằng số; có chân đã gắn linh kiện trên board và chân còn trống (21, 22, 35).",
+      "evidence": [{"file": "docs/hardware/esp32-3248s035r.md", "symbol": "## Bảng GPIO"}]
+    },
+    {
+      "id": "Peripheral",
+      "kind": "concept",
+      "area": "hardware",
+      "parent": null,
+      "label": {"en": "Peripheral", "vi": "Ngoại vi"},
+      "synonyms": ["linh kiện", "module"],
+      "definition": "Thiết bị gắn vào board, có sẵn trên board hoặc cắm thêm, mà firmware điều khiển qua chân GPIO.",
+      "evidence": [{"file": "docs/hardware/esp32-3248s035r.md", "symbol": "## Thông số"}]
+    },
+    {
+      "id": "Display",
+      "kind": "entity",
+      "area": "hardware",
+      "parent": "Peripheral",
+      "label": {"en": "Display", "vi": "Màn hình"},
+      "synonyms": ["LCD", "ST7796", "màn"],
+      "definition": "Màn 480x320 driver ST7796 nối qua SPI; đèn nền bật tắt riêng bằng GPIO27.",
+      "attributes": [
+        {"name": "backlight_gpio", "type": "int", "definition": "Chân điều khiển đèn nền; 27 trên board này, 21 trên bản 2.8\".", "evidence": [{"file": "docs/hardware/esp32-3248s035r.md", "symbol": "| Đèn nền LCD | GPIO27 |"}]}
+      ],
+      "evidence": [{"file": "docs/hardware/esp32-3248s035r.md", "symbol": "- Màn: driver ST7796, 480x320"}]
+    },
+    {
+      "id": "TouchPanel",
+      "kind": "entity",
+      "area": "hardware",
+      "parent": "Peripheral",
+      "label": {"en": "Touch panel", "vi": "Cảm ứng"},
+      "synonyms": ["XPT2046", "touch"],
+      "definition": "Lớp cảm ứng điện trở đọc qua chip XPT2046; phải ấn, không đa điểm, cần hiệu chỉnh.",
+      "evidence": [{"file": "docs/hardware/esp32-3248s035r.md", "symbol": "- Cảm ứng: điện trở, chip XPT2046"}]
+    },
+    {
+      "id": "Speaker",
+      "kind": "entity",
+      "area": "hardware",
+      "parent": "Peripheral",
+      "label": {"en": "Speaker", "vi": "Loa"},
+      "synonyms": ["loa 8Ω", "SPEAK1"],
+      "definition": "Loa 8Ω 1–2W cắm vào SPEAK1, phát âm thanh từ DAC GPIO26 qua ampli U5.",
+      "evidence": [{"file": "docs/hardware/esp32-3248s035r.md", "symbol": "| Loa (DAC) | GPIO26 |"}]
+    },
+    {
+      "id": "Microphone",
+      "kind": "entity",
+      "area": "hardware",
+      "parent": "Peripheral",
+      "label": {"en": "Microphone", "vi": "Mic"},
+      "synonyms": ["INMP441", "mic I2S"],
+      "definition": "Mic I2S INMP441 cắm thêm qua CN1 và P3; chưa mua.",
+      "evidence": [{"file": "docs/hardware/esp32-3248s035r.md", "symbol": "## Đi dây mic INMP441 (kế hoạch)"}]
+    },
+    {
+      "id": "Battery",
+      "kind": "entity",
+      "area": "hardware",
+      "parent": "Peripheral",
+      "label": {"en": "Battery", "vi": "Pin"},
+      "synonyms": ["LiPo", "pin 3.7V", "BAT1"],
+      "definition": "Pin LiPo 3.7V 1 cell có mạch bảo vệ, cắm vào BAT1; chưa mua.",
+      "evidence": [{"file": "docs/hardware/esp32-3248s035r.md", "symbol": "- Pin: LiPo 3.7V 1 cell"}]
+    },
+    {
+      "id": "SdCard",
+      "kind": "entity",
+      "area": "hardware",
+      "parent": "Peripheral",
+      "label": {"en": "SD card", "vi": "Thẻ nhớ"},
+      "synonyms": ["microSD", "TF1", "TF card"],
+      "definition": "Thẻ microSD trong khe TF1, bus VSPI riêng; lưu âm thanh, hình linh vật, log, không thay được RAM.",
+      "evidence": [{"file": "docs/hardware/esp32-3248s035r.md", "symbol": "| Thẻ SD CS / SCK / MOSI / MISO |"}]
+    },
+    {
+      "id": "Device",
+      "kind": "entity",
+      "area": "system",
+      "parent": null,
+      "label": {"en": "Device", "vi": "Thiết bị"},
+      "synonyms": ["firmware", "thin client", "con trợ lý"],
+      "definition": "Firmware chạy trên Board: hiện linh vật, nhận chạm, stream mic lên và phát âm thanh nhận về; không giữ API key.",
+      "evidence": [{"file": "docs/design/assistant.md", "symbol": "- **Device**: firmware trên board."}]
+    },
+    {
+      "id": "HomeServer",
+      "kind": "entity",
+      "area": "system",
+      "parent": null,
+      "label": {"en": "Home server", "vi": "Server ở nhà"},
+      "synonyms": ["server", "relay"],
+      "definition": "Chương trình Python trong mạng nhà làm toàn bộ phần nặng: từ đánh thức, chuyển giọng nói và chữ, gọi Brain, công cụ.",
+      "evidence": [{"file": "docs/design/assistant.md", "symbol": "- **HomeServer**: chương trình Python ở nhà."}]
+    },
+    {
+      "id": "Brain",
+      "kind": "concept",
+      "area": "system",
+      "parent": null,
+      "label": {"en": "Brain", "vi": "Bộ não"},
+      "synonyms": ["LLM", "model", "đầu não"],
+      "definition": "Model ngôn ngữ trả lời và suy nghĩ cho trợ lý; chỉ nhận và trả chữ.",
+      "evidence": [{"file": "docs/design/assistant.md", "symbol": "- **Brain**: model ngôn ngữ"}]
+    },
+    {
+      "id": "BrainProvider",
+      "kind": "config",
+      "area": "system",
+      "parent": null,
+      "label": {"en": "Brain provider", "vi": "Nhà cung cấp bộ não"},
+      "synonyms": ["Muse API", "Claude API", "provider"],
+      "definition": "Lựa chọn trong cấu hình server quyết định gọi model của nhà cung cấp nào bằng API key.",
+      "evidence": [{"file": "docs/decisions/0002-swappable-brain.md", "symbol": "- HomeServer gọi model qua một lớp `BrainProvider`"}]
+    },
+    {
+      "id": "FastBrain",
+      "kind": "process",
+      "area": "system",
+      "parent": "Brain",
+      "label": {"en": "Fast brain", "vi": "Não nhanh"},
+      "synonyms": ["fast path"],
+      "definition": "Phần Brain trả lời ngay trong một Turn, dùng model nhanh và rẻ.",
+      "evidence": [{"file": "docs/design/assistant.md", "symbol": "**FastBrain**: trả lời ngay"}]
+    },
+    {
+      "id": "SlowBrain",
+      "kind": "process",
+      "area": "system",
+      "parent": "Brain",
+      "label": {"en": "Slow brain", "vi": "Não chậm"},
+      "synonyms": ["agent chạy nền", "slow path"],
+      "definition": "Phần Brain chạy việc nền (nghiên cứu, nhắc việc) và báo kết quả về sau.",
+      "evidence": [{"file": "docs/design/assistant.md", "symbol": "**SlowBrain**: việc chạy nền"}]
+    },
+    {
+      "id": "Turn",
+      "kind": "event",
+      "area": "system",
+      "parent": null,
+      "label": {"en": "Turn", "vi": "Lượt hỏi đáp"},
+      "synonyms": ["lượt", "câu hỏi"],
+      "definition": "Một lần người dùng nói và trợ lý trả lời, từ lúc kích hoạt tới lúc phát xong câu trả lời.",
+      "evidence": [{"file": "docs/design/assistant.md", "symbol": "## Một lượt hỏi đáp (Turn)"}]
+    },
+    {
+      "id": "Mascot",
+      "kind": "entity",
+      "area": "system",
+      "parent": null,
+      "label": {"en": "Mascot", "vi": "Linh vật"},
+      "synonyms": ["pet", "nhân vật"],
+      "definition": "Nhân vật trên màn Device thể hiện trạng thái trợ lý bằng biểu cảm.",
+      "evidence": [{"file": "docs/design/assistant.md", "symbol": "## Trạng thái linh vật (Mascot)"}]
+    },
+    {
+      "id": "BackgroundTask",
+      "kind": "entity",
+      "area": "system",
+      "parent": null,
+      "label": {"en": "Background task", "vi": "Việc chạy nền"},
+      "synonyms": ["job"],
+      "definition": "Một việc SlowBrain nhận, chạy và báo kết quả cho người dùng sau khi xong.",
+      "evidence": [{"file": "docs/design/assistant.md", "symbol": "## Việc chạy nền (BackgroundTask)"}]
+    },
+    {
+      "id": "WakeWordDetection",
+      "kind": "process",
+      "area": "system",
+      "parent": null,
+      "label": {"en": "Wake word detection", "vi": "Nghe từ đánh thức"},
+      "synonyms": ["openWakeWord", "Hey ..."],
+      "definition": "Server nghe dòng âm thanh từ Device để phát hiện từ đánh thức và bắt đầu một Turn.",
+      "evidence": [{"file": "docs/decisions/0003-wake-word-on-server.md", "symbol": "server chạy openWakeWord"}]
+    },
+    {
+      "id": "SpeechToText",
+      "kind": "process",
+      "area": "system",
+      "parent": null,
+      "label": {"en": "Speech to text", "vi": "Giọng nói thành chữ"},
+      "synonyms": ["STT", "faster-whisper"],
+      "definition": "Bước server đổi âm thanh người dùng thành chữ để đưa cho Brain.",
+      "evidence": [{"file": "docs/design/assistant.md", "symbol": "speech-to-text → FastBrain"}]
+    },
+    {
+      "id": "TextToSpeech",
+      "kind": "process",
+      "area": "system",
+      "parent": null,
+      "label": {"en": "Text to speech", "vi": "Chữ thành giọng nói"},
+      "synonyms": ["TTS", "Piper"],
+      "definition": "Bước server đổi câu trả lời thành âm thanh thô gửi xuống Device.",
+      "evidence": [{"file": "docs/design/assistant.md", "symbol": "FastBrain → text-to-speech"}]
+    },
+    {
+      "id": "ApiKey",
+      "kind": "concept",
+      "area": "system",
+      "parent": null,
+      "label": {"en": "API key", "vi": "Khóa API"},
+      "synonyms": ["key", "server/.env"],
+      "definition": "Bí mật để gọi BrainProvider; chỉ nằm trên HomeServer.",
+      "evidence": [{"file": "docs/decisions/0001-thin-client-home-server.md", "symbol": "- API key chỉ nằm trên HomeServer."}]
+    }
+  ],
+  "relations": [
+    {"id": "board_has_connector", "from": "Board", "to": "Connector", "cardinality": "1:N", "definition": "Board có các cổng vật lý.", "evidence": [{"file": "docs/hardware/esp32-3248s035r.md", "symbol": "## Cổng"}]},
+    {"id": "connector_exposes_gpio", "from": "Connector", "to": "GpioPin", "cardinality": "N:M", "definition": "Một cổng đưa ra một số chân; cùng một chân có thể ra nhiều cổng (IO21, IO22 ở cả CN1 và P3).", "evidence": [{"file": "docs/hardware/esp32-3248s035r.md", "symbol": "| CN1 | `3.3V IO21 IO22 GND`"}]},
+    {"id": "board_has_peripheral", "from": "Board", "to": "Peripheral", "cardinality": "1:N", "definition": "Ngoại vi có sẵn hoặc cắm thêm vào board.", "evidence": [{"file": "docs/hardware/esp32-3248s035r.md", "symbol": "## Thông số"}]},
+    {"id": "microphone_wired_to_connector", "from": "Microphone", "to": "Connector", "cardinality": "N:M", "definition": "Mic nối qua hai cổng CN1 và P3.", "evidence": [{"file": "docs/hardware/esp32-3248s035r.md", "symbol": "| SD | P3 → IO35 |"}]},
+    {"id": "speaker_plugs_into", "from": "Speaker", "to": "Connector", "cardinality": "N:1", "definition": "Loa cắm vào SPEAK1.", "evidence": [{"file": "docs/hardware/esp32-3248s035r.md", "symbol": "| SPEAK1 | `SPEAK1` |"}]},
+    {"id": "battery_plugs_into", "from": "Battery", "to": "Connector", "cardinality": "N:1", "definition": "Pin cắm vào BAT1.", "evidence": [{"file": "docs/hardware/esp32-3248s035r.md", "symbol": "| BAT1 | `BAT+ BAT-` |"}]},
+    {"id": "device_runs_on_board", "from": "Device", "to": "Board", "cardinality": "1:1", "definition": "Firmware Device chạy trên một Board.", "evidence": [{"file": "docs/design/assistant.md", "symbol": "- **Device**: firmware trên board."}]},
+    {"id": "device_streams_to_server", "from": "Device", "to": "HomeServer", "cardinality": "N:1", "definition": "Device stream âm thanh mic và sự kiện chạm lên HomeServer qua WebSocket trong mạng nhà.", "evidence": [{"file": "docs/design/assistant.md", "symbol": "2. Device stream âm thanh mic (PCM 16kHz)"}]},
+    {"id": "device_shows_mascot", "from": "Device", "to": "Mascot", "cardinality": "1:1", "definition": "Device vẽ linh vật trên màn.", "evidence": [{"file": "docs/design/assistant.md", "symbol": "Hiện linh vật"}]},
+    {"id": "server_uses_provider", "from": "HomeServer", "to": "BrainProvider", "cardinality": "N:1", "definition": "Server gọi đúng một nhà cung cấp tại một thời điểm, chọn bằng cấu hình.", "evidence": [{"file": "docs/decisions/0002-swappable-brain.md", "symbol": "chọn bằng cấu hình"}]},
+    {"id": "server_holds_apikey", "from": "HomeServer", "to": "ApiKey", "cardinality": "1:N", "definition": "Server giữ API key của các nhà cung cấp.", "evidence": [{"file": "docs/decisions/0001-thin-client-home-server.md", "symbol": "- API key chỉ nằm trên HomeServer."}]},
+    {"id": "turn_handled_by_fastbrain", "from": "Turn", "to": "FastBrain", "cardinality": "N:1", "definition": "Mỗi Turn được FastBrain trả lời.", "evidence": [{"file": "docs/design/assistant.md", "symbol": "3. HomeServer: speech-to-text"}]},
+    {"id": "slowbrain_runs_task", "from": "SlowBrain", "to": "BackgroundTask", "cardinality": "1:N", "definition": "SlowBrain chạy các việc nền.", "evidence": [{"file": "docs/design/assistant.md", "symbol": "## Việc chạy nền (BackgroundTask)"}]}
+  ],
+  "states": [
+    {
+      "class": "Mascot",
+      "attribute": "state",
+      "values": ["idle", "listening", "thinking", "speaking", "notifying"],
+      "transitions": [
+        {"from": "idle", "to": "listening", "trigger": "chạm màn hoặc nghe thấy từ đánh thức", "evidence": [{"file": "docs/design/assistant.md", "symbol": "`idle` → `listening`"}]},
+        {"from": "listening", "to": "thinking", "trigger": "người dùng nói xong", "evidence": [{"file": "docs/design/assistant.md", "symbol": "`thinking` (đã nói xong)"}]},
+        {"from": "thinking", "to": "speaking", "trigger": "có âm thanh trả lời", "evidence": [{"file": "docs/design/assistant.md", "symbol": "`speaking` (có âm thanh trả lời)"}]},
+        {"from": "speaking", "to": "idle", "trigger": "phát xong", "evidence": [{"file": "docs/design/assistant.md", "symbol": "`speaking` (có âm thanh trả lời) → `idle`"}]},
+        {"from": "idle", "to": "notifying", "trigger": "SlowBrain có kết quả", "evidence": [{"file": "docs/design/assistant.md", "symbol": "`notifying`: SlowBrain có kết quả"}]},
+        {"from": "notifying", "to": "speaking", "trigger": "người dùng chạm vào", "evidence": [{"file": "docs/design/assistant.md", "symbol": "chạm vào thì chuyển sang `speaking`"}]}
+      ],
+      "evidence": [{"file": "docs/design/assistant.md", "symbol": "## Trạng thái linh vật (Mascot)"}]
+    },
+    {
+      "class": "BackgroundTask",
+      "attribute": "status",
+      "values": ["queued", "running", "done", "delivered", "failed"],
+      "transitions": [
+        {"from": "queued", "to": "running", "trigger": "SlowBrain bắt đầu", "evidence": [{"file": "docs/design/assistant.md", "symbol": "`queued` → `running`"}]},
+        {"from": "running", "to": "done", "trigger": "xong việc", "evidence": [{"file": "docs/design/assistant.md", "symbol": "`running` → `done`"}]},
+        {"from": "done", "to": "delivered", "trigger": "đã báo cho người dùng", "evidence": [{"file": "docs/design/assistant.md", "symbol": "`done` → `delivered`"}]},
+        {"from": "running", "to": "failed", "trigger": "lỗi", "evidence": [{"file": "docs/design/assistant.md", "symbol": "`running` → `failed`"}]}
+      ],
+      "evidence": [{"file": "docs/design/assistant.md", "symbol": "## Việc chạy nền (BackgroundTask)"}]
+    }
+  ],
+  "enums": [
+    {"name": "BrainProviderName", "values": ["muse", "claude"], "evidence": [{"file": "docs/decisions/0002-swappable-brain.md", "symbol": "`brain = \"muse\"`"}]},
+    {"name": "ActivationMethod", "values": ["touch", "wake_word"], "evidence": [{"file": "docs/decisions/0003-wake-word-on-server.md", "symbol": "Luôn giữ cách kích hoạt dự phòng: chạm màn."}]}
+  ],
+  "rules": [
+    {"id": "R1", "statement": "Code màn hình dùng cấu hình 3.5\" (ST7796, đèn nền GPIO27); cấu hình 2.8\" làm màn đen.", "applies_to": ["Display", "Board"], "enforced_by": [{"file": "AGENTS.md", "symbol": "Code cho bản 2.8\" làm màn đen"}], "tested_by": []},
+    {"id": "R2", "statement": "API key chỉ nằm trên HomeServer, không bao giờ trên Device.", "applies_to": ["ApiKey", "Device", "HomeServer"], "enforced_by": [{"file": "docs/decisions/0001-thin-client-home-server.md", "symbol": "- API key chỉ nằm trên HomeServer."}], "tested_by": []},
+    {"id": "R3", "statement": "Mic dùng IO21, IO22, IO35; khi gắn mic thì CN1 không còn dùng cho I2C.", "applies_to": ["Microphone", "Connector"], "enforced_by": [{"file": "docs/hardware/esp32-3248s035r.md", "symbol": "Gắn mic thì hết chân cho cảm biến I2C"}], "tested_by": []},
+    {"id": "R4", "statement": "Pin là LiPo 1 cell có mạch bảo vệ; dây đỏ vào BAT+.", "applies_to": ["Battery"], "enforced_by": [{"file": "docs/hardware/esp32-3248s035r.md", "symbol": "Dây đỏ vào `BAT+`"}], "tested_by": []},
+    {"id": "R5", "statement": "Sao lưu flash gốc trước lần nạp firmware đầu tiên.", "applies_to": ["Board", "Device"], "enforced_by": [{"file": "AGENTS.md", "symbol": "Trước lần nạp firmware đầu tiên: sao lưu flash gốc"}], "tested_by": []},
+    {"id": "R6", "statement": "Không chạy từ đánh thức trên chip; Device stream âm thanh để server nghe.", "applies_to": ["Device", "WakeWordDetection"], "enforced_by": [{"file": "docs/hardware/esp32-3248s035r.md", "symbol": "- Không PSRAM: không chạy được từ đánh thức trên chip"}], "tested_by": []},
+    {"id": "R7", "statement": "Server gọi model bằng API key, không bằng đăng nhập gói thuê bao claude.ai.", "applies_to": ["BrainProvider"], "enforced_by": [{"file": "docs/decisions/0002-swappable-brain.md", "symbol": "Không dùng đăng nhập gói thuê bao claude.ai trong server"}], "tested_by": []},
+    {"id": "R8", "statement": "Thông tin tài khoản và gói dịch vụ chỉ ghi vào docs/private (repo công khai).", "applies_to": ["BrainProvider", "ApiKey"], "enforced_by": [{"file": "AGENTS.md", "symbol": "thông tin cá nhân, tài khoản, số dư chỉ ghi vào `docs/private/`"}], "tested_by": []}
+  ]
+}

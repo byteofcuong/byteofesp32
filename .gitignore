@@ -1,0 +1,23 @@
+# Thông tin cá nhân, tài khoản (repo công khai)
+docs/private/
+
+# Bí mật
+.env
+*.env
+
+# Bản sao lưu flash và firmware build ra
+*.bin
+
+# PlatformIO / ESP-IDF
+.pio/
+build/
+sdkconfig.old
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Model tải về (Whisper, Piper, openWakeWord)
+models/
