@@ -1,7 +1,7 @@
 ---
 date: 2026-11-17
 branch: feature/server-link
-commit: 42c473f (+ thay đổi chưa commit của bước 2)
+commit: f01781e
 ---
 # Handoff
 
@@ -28,7 +28,7 @@ Trợ lý giọng nói để bàn trên board ESP32-3248S035R. Bước 1 (linh v
 0. Đã tắt (2026-11-17, người dùng yêu cầu): server `byteof`, quick tunnel `cloudflared` (địa chỉ cũ hết hiệu lực; lần sau chạy lại thì địa chỉ mới, phải sửa `BYTEOF_SERVER_URL` hoặc trang cài WiFi), container `muse2api` (`docker stop`; Docker Desktop vẫn chạy vì có container dự án khác `vietstrain-*`, KHÔNG tắt Docker). `muse2api` có `restart: always` nên Docker khởi động lại thì nó tự lên. Bật lại: `docker start muse2api`, `cd server && .venv/Scripts/python -m byteof`, `cloudflared tunnel --url http://localhost:8765`.
 1. `muse2api` đã clone ở `D:\Direc of code\pet_project\muse2api` (ghim `19db32a3d6ef`), `docker-compose.yml` sửa cổng `127.0.0.1:18610:18610` + `MUSE2API_MANAGED_DEPLOYMENT=1`, khóa ngẫu nhiên trong `.env` của nó. Container đã chạy (2026-11-16): `docker ps` báo `127.0.0.1:18610->18610/tcp`; `/v1/models` không khóa → 401, có khóa (gọi trong container) → 200 với `muse-spark`, `muse-image`, `muse-video`. Người dùng đã nạp extension và nhập cookie (`POST /admin/accounts` 200). Chat thử qua `http://127.0.0.1:18610/v1/chat/completions` (model `muse-spark`, stream): HTTP 200, tiếng Việt tốt, nhưng chữ đầu tiên mất 10.9–20.1s (chi tiết `docs/research/muse.md`). Script thử nằm ở scratchpad, chưa đưa vào repo.
    - Đo thêm 3 câu cực ngắn ("chào", "1+1", "ok"): 12.5s, 12.5s, 7.9s. Độ trễ do Muse, không do muse2api (nó tái dùng cùng thread, không mở trang mới). Người dùng chọn chỉ dùng Muse.
-2. Bước 2 (nhánh `feature/server-link`, CHƯA commit phần này; commit `42c473f` chỉ có docs Muse):
+2. Bước 2 (nhánh `feature/server-link`, đã commit `f01781e`, chưa merge vào `main`, chưa push):
    - **Chạy trên board (2026-11-17):** board cài WiFi bằng điện thoại (người dùng đã cài xong), vào server qua `wss://` quick tunnel, `[link] status=online heap≈76KB`; server thấy `device online fw=0.3.0`. Quét fps khi online: 23.4–30.3.
    - Đã viết: ADR 0007, ADR 0008 (cài WiFi bằng điện thoại + Cloudflare Tunnel + TLS + ngân sách RAM), `docs/design/protocol.md`, `server/` (24 test pass), firmware `server_link`/`net_config`/`portal`, `firmware/certs/`, spec linh vật (mục RAM), ontology (WifiSetup, ServerTunnel, DeviceToken, R11, R12; check errors=0 warnings=11), AGENTS.md.
    - RAM: linh vật giảm từ ~150KB xuống ~87KB (một ảnh tai + lật gương; tai và vòm cười lưu độ phủ 8-bit, dán qua bảng màu `blitMask`; dải vẽ 40 dòng; chấm báo tạo khi cần). Lúc cài WiFi, `Mascot::end()` trả hết.
@@ -37,7 +37,7 @@ Trợ lý giọng nói để bàn trên board ESP32-3248S035R. Bước 1 (linh v
      b. Người dùng sửa `server/.env`: `BYTEOF_HOST=0.0.0.0` → `127.0.0.1` (agent bị chặn đụng `.env`).
      c. Người dùng mua tên miền + tạo tài khoản Cloudflare; agent tạo named tunnel (`cloudflared tunnel login/create/route dns`), chạy như service Windows, đổi `BYTEOF_SERVER_URL` (hoặc sửa ở trang cài WiFi).
      d. Server và cloudflared phải tự bật khi PC khởi động (chưa làm).
-     e. Commit (hỏi người dùng trước).
+     e. Merge `feature/server-link` vào `main` và push (hỏi người dùng trước).
    - Lỗi đã sửa 2026-11-17: script dọn mã đo tạm xóa nhầm khối vẽ ảnh đệm miệng (tìm `
   }` sai) → con cáo mất miệng; đã lấy lại từ git và soát mọi dòng bị xóa trong diff `mascot.cpp`. Bài học: dọn bằng Edit tool có chuỗi khớp đúng, không cắt theo dấu `}`.
    - fps online đo lại khi đủ miệng: 18.7 (cry) – 30.2; tắt WiFi chỉ kém bản gốc ~1 fps; WiFi làm mặt nặng chậm thêm 3–4 fps (không do nhịp hỏi mạng). Lệnh Serial `e`/`s` giờ đi qua lớp hành vi (trước đó lớp rảnh chen vào làm số đo trạng thái sai).
