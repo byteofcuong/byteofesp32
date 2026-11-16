@@ -56,4 +56,4 @@ Chạy skill `handoff`: chuyển bản cũ vào `docs/handoff/archive/`, viết 
 
 ## Team
 - Codex: chưa hỏi người dùng. Hỏi trước lần đầu gửi code sang Codex và ghi câu trả lời vào đây.
-- Chưa có lệnh chạy lâu, cổng hay tài nguyên dùng chung.
+- Dịch vụ chạy lâu: `muse2api` (ADR 0006), Docker container `muse2api`, cài ở thư mục anh em `../muse2api` (ngoài repo), cổng `127.0.0.1:18610`. Khóa nằm trong `../muse2api/.env`, không đọc ra chat. Bật: `docker compose up -d` trong thư mục đó (Docker Desktop phải chạy).

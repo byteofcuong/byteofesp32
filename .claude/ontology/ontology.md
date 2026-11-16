@@ -63,6 +63,7 @@ classDiagram
 | SpeechToText | process | Đổi giọng nói thành chữ | STT, faster-whisper | [assistant.md:15](docs/design/assistant.md#L15) |
 | TextToSpeech | process | Đổi câu trả lời thành âm thanh | TTS, Piper | [assistant.md:15](docs/design/assistant.md#L15) |
 | ApiKey | concept | Bí mật gọi BrainProvider, chỉ ở server | key | [0001-thin-client-home-server.md:13](docs/decisions/0001-thin-client-home-server.md#L13) |
+| Muse2Api | process | Dịch vụ bên thứ ba chạy riêng trên máy server, đóng gói web muse.ai thành API kiểu OpenAI | muse2api | [0006-muse-via-muse2api.md](docs/decisions/0006-muse-via-muse2api.md) |
 
 ## 4. Quan hệ
 | Quan hệ | Từ → Đến | Bản số | Thể hiện ở |
@@ -81,6 +82,7 @@ classDiagram
 | turn_handled_by_fastbrain | Turn → FastBrain | N:1 | Bước 3 của một lượt |
 | slowbrain_runs_task | SlowBrain → BackgroundTask | 1:N | Việc chạy nền |
 | touchpanel_uses_calibration | TouchPanel → TouchCalibration | 1:1 | `rawToScreen()` trong `firmware/src/touch.cpp` |
+| provider_muse_via_muse2api | BrainProvider → Muse2Api | N:1 | `base_url = http://127.0.0.1:18610/v1` |
 
 ## 5. Vòng đời
 Mascot.state ([assistant.md:20](docs/design/assistant.md#L20)):
@@ -116,9 +118,10 @@ Giá trị khác (enum): `BrainProviderName` = muse, claude; `ActivationMethod` 
 | R4 | Pin LiPo 1 cell có bảo vệ; dây đỏ vào BAT+ | [esp32-3248s035r.md:36](docs/hardware/esp32-3248s035r.md#L36) | Chưa có |
 | R5 | Sao lưu flash gốc trước lần nạp đầu tiên | [AGENTS.md:46](AGENTS.md#L46) | Chưa có |
 | R6 | Không chạy từ đánh thức trên chip; Device stream âm thanh | [esp32-3248s035r.md:66](docs/hardware/esp32-3248s035r.md#L66) | Chưa có |
-| R7 | Server gọi model bằng API key, không bằng đăng nhập claude.ai | [0002:11](docs/decisions/0002-swappable-brain.md#L11) | Chưa có |
+| R7 | Server gọi model bằng API key, không bằng đăng nhập claude.ai (ngoại lệ: Muse qua muse2api, ADR 0006) | [0002:11](docs/decisions/0002-swappable-brain.md#L11) | Chưa có |
 | R8 | Thông tin tài khoản chỉ ở docs/private | [AGENTS.md:48](AGENTS.md#L48) | Chưa có |
 | R9 | Màn dùng TFT_eSPI; cảm ứng chỉ coi là chạm khi PENIRQ (GPIO36) thấp, không dùng `getTouch()` của TFT_eSPI | [touch.cpp:122](firmware/src/touch.cpp#L122), [AGENTS.md:45](AGENTS.md#L45) | `touch::verify()` in `[touchtest] worst=` (bán tự động, cần người chạm) |
+| R10 | muse2api chạy ngoài repo, chỉ mở cổng 127.0.0.1, ghim commit đã đọc; cookie không commit | [0006](docs/decisions/0006-muse-via-muse2api.md) | Chưa có |
 
 ## 7. Phát hiện
 - Tên gọi trôi: người bán gọi board là "2.8 inch"; nghiên cứu ban đầu dùng "CYD ESP32-2432S028R"; đúng là ESP32-3248S035R. Mọi tài liệu mới dùng tên đúng.

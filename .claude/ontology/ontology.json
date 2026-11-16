@@ -586,6 +586,27 @@
           "symbol": "- API key chỉ nằm trên HomeServer."
         }
       ]
+    },
+    {
+      "id": "Muse2Api",
+      "kind": "process",
+      "area": "system",
+      "parent": null,
+      "label": {
+        "en": "muse2api gateway",
+        "vi": "Cổng muse2api"
+      },
+      "synonyms": [
+        "muse2api",
+        "Muse provider"
+      ],
+      "definition": "Dịch vụ bên thứ ba chạy riêng trên máy server, đóng gói web muse.ai thành API kiểu OpenAI; BrainProvider \"muse\" gọi qua nó.",
+      "evidence": [
+        {
+          "file": "docs/decisions/0006-muse-via-muse2api.md",
+          "symbol": "- `muse2api` chạy **ngoài repo này**"
+        }
+      ]
     }
   ],
   "relations": [
@@ -768,6 +789,19 @@
         {
           "file": "docs/design/assistant.md",
           "symbol": "## Việc chạy nền (BackgroundTask)"
+        }
+      ]
+    },
+    {
+      "id": "provider_muse_via_muse2api",
+      "from": "BrainProvider",
+      "to": "Muse2Api",
+      "cardinality": "N:1",
+      "definition": "Provider muse gọi muse2api ở http://127.0.0.1:18610/v1.",
+      "evidence": [
+        {
+          "file": "docs/decisions/0006-muse-via-muse2api.md",
+          "symbol": "`base_url = http://127.0.0.1:18610/v1`"
         }
       ]
     }
@@ -1081,7 +1115,7 @@
     },
     {
       "id": "R7",
-      "statement": "Server gọi model bằng API key, không bằng đăng nhập gói thuê bao claude.ai.",
+      "statement": "Server gọi model bằng API key, không bằng đăng nhập gói thuê bao claude.ai. Ngoại lệ: Muse qua muse2api (ADR 0006).",
       "applies_to": [
         "BrainProvider"
       ],
@@ -1131,6 +1165,20 @@
           "symbol": "void verify() {"
         }
       ]
+    },
+    {
+      "id": "R10",
+      "statement": "muse2api chạy ngoài repo, chỉ mở cổng 127.0.0.1, ghim commit đã đọc; cookie của nó không commit.",
+      "applies_to": [
+        "Muse2Api"
+      ],
+      "enforced_by": [
+        {
+          "file": "docs/decisions/0006-muse-via-muse2api.md",
+          "symbol": "Chỉ mở cổng cho máy mình"
+        }
+      ],
+      "tested_by": []
     }
   ]
 }
