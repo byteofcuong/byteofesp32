@@ -87,36 +87,41 @@ Tai cụp bằng **ép thấp + nghiêng nhẹ** (≤ 10°); xoay mạnh làm ta
 | speaking | cam; miệng D đặc, há theo âm tiết (0.16–0.30 s/âm tiết, lò xo k220 c26) |
 | notifying | vàng; mặt hào hứng không lưỡi, nhìn thẳng; nhún 2 nhịp + vẫy tai mỗi 1.6 s; **viền màn hình sáng nhấp nháy** (chu kỳ 0.8 s); **chấm báo "!"** ở (440, 72) với 2 vòng lan |
 
-## Chạm (firmware `main.cpp`, bản mẫu: chạm vào khung lớn)
+## Chạm (firmware `main.cpp` + `behavior.cpp`, bản mẫu: chạm vào khung lớn)
+Từ 2026-11-17 không còn chạm để đổi biểu cảm hay trạng thái: cảm xúc tự xuất hiện theo `docs/design/behavior.md`.
 | Cử chỉ | Kết quả |
 |---|---|
 | Chạm 1 lần vào mắt | nháy mắt đó |
 | Chạm 1 lần vào mũi/miệng | "boop": híp mắt (đá vận tốc `sm`), nảy, giật tai |
 | Chạm 1 lần chỗ khác | nhìn về điểm chạm 1.8 s, liếc xa thì chớp |
-| Chạm 2 lần trong 350 ms | biểu cảm tiếp theo |
-| Giữ 0.6–5 s | trạng thái tiếp theo |
+| Vài lần chạm liền / chọc liên tục / giữ tay | vui / khó chịu / thương, ngượng (bảng trong `behavior.md`, chỉ khi rảnh) |
 | Giữ > 5 s | hiệu chỉnh cảm ứng |
 
 ## Trên firmware (`firmware/src/mascot.*`, đo 2026-11-16)
-- Vẽ vào sprite 16-bit 448x56 **theo từng dải ngang**, chỉ đẩy vùng mặt (x 80..400, y 24..316; rộng hơn khi có sóng âm, ba chấm, chữ z).
+- Vẽ vào sprite 16-bit 448x40 **theo từng dải ngang** (trước 56 dòng; 40 dòng fps như nhau mà bớt 14KB RAM), chỉ đẩy vùng mặt (x 80..400, y 24..316; rộng hơn khi có sóng âm, ba chấm, chữ z).
 - Làm mịn cạnh bằng `fillSmoothRoundRect`, `fillSmoothCircle`, `drawWideLine` của TFT_eSPI. Mép nét phải **pha với pixel bên dưới** (`bg = 0x00FFFFFF`); pha với màu cố định làm chỗ chồng nhau thành vệt tối như vết cắt.
 - **Ảnh đệm** (vẽ lại chỉ khi thông số đổi, khóa băm `quantKey`):
-  - tai 150x124 x2;
-  - cụm mũi + miệng 96x60, dán đặc và vẽ trước mắt;
-  - vòm mắt cười 112x68 x2, dán đặc, khung ôm sát để nền đen không đè tai.
+  - tai 150x124, **một ảnh**: tai phải dán lật gương (hai tai đối xứng qua trục giữa);
+  - cụm mũi + miệng 96x60 (16-bit), dán đặc và vẽ trước mắt;
+  - vòm mắt cười 112x68 x2, dán đặc, khung ôm sát để nền đen không đè tai;
+  - tai và vòm cười lưu **độ phủ 8-bit** thay vì màu 16-bit: vẽ bằng màu "đỏ" (hình ngoài) và "vàng" (lòng tai) vào sprite RGB332, lúc dán tra bảng 256 màu pha sẵn (`blitMask`). Nửa bộ nhớ, dán nhanh hơn `pushToSprite`;
   - Dán trong suốt từng pixel quá chậm.
+- **RAM** (2026-11-17, ADR 0008): linh vật ~87KB (trước ~150KB). WiFi + bắt tay TLS cần phần còn lại; thêm ảnh đệm mới phải đo lại `heap=` trong log `[link]`. Khi cài WiFi, `Mascot::end()` trả hết ảnh đệm.
 - **Hình rẻ thay nét dày:**
   - tam giác bo góc = tam giác co + 3 dải cạnh tô đặc + 3 hình tròn góc + nét mảnh 1.5 làm mịn. Nét dày 2r tốn 36ms cho 2 tai, gây khựng khi chuyển biểu cảm;
   - vòm cười = chuỗi hình tròn (`thickQuad`);
   - mí = tô theo cột + nét mảnh dọc mép.
 - **Thông báo:**
   - viền vẽ thẳng lên TFT sau các dải;
-  - chấm báo vẽ trong sprite riêng 76x84 ở (400, 30);
+  - chấm báo vẽ trong sprite riêng 76x84 ở (400, 30), chỉ tạo khi đang thông báo (nhường RAM cho TLS lúc thường);
   - vùng mặt và chấm báo không được đè lên viền, đè thì viền nháy đen;
   - nới vùng mặt để chứa chấm báo làm tụt 21 fps.
 - **Run** ~3.7 Hz (23/19 rad/s). Tần số cao hơn khi lấy mẫu 25 fps trông như giật.
 - **SPI** 80MHz; đẩy một khung ~26ms.
-- **Kết quả:** 23.6 (khóc) đến 30.3 khung/giây; khung chậm nhất khi chuyển biểu cảm 41–52ms; heap còn ~138KB.
+- **Kết quả:** 23.6 (khóc) đến 30.3 khung/giây; khung chậm nhất khi chuyển biểu cảm 41–52ms; heap còn ~138KB (2026-11-16, chưa có WiFi).
+- **Có WiFi + TLS online** (2026-11-17, đủ miệng, lệnh đo đi qua lớp hành vi): 18.7 (khóc) đến 30.2 khung/giây; trạng thái 23.5–28.9; khung chậm nhất khi chuyển ≤ 63ms; heap ~75KB.
+  - Cùng firmware, tắt WiFi: chỉ chậm hơn bản gốc ~1 fps (khóc 22.7). WiFi làm các mặt nặng (thương, buồn, khóc, giận, sợ, chán, buồn ngủ) chậm thêm 3–4 fps. Giãn nhịp hỏi mạng 5 → 20ms không đổi gì. Hướng tối ưu về sau: miệng gợn sóng (`mv`) đang vẽ lại ảnh đệm mỗi khung; đưa hàm vẽ nóng vào IRAM.
+  - Dải 40 và 56 dòng cho fps như nhau (đo lại khi đủ miệng).
 - **Lệnh Serial:** `e` biểu cảm tiếp, `s` trạng thái tiếp (đo bằng script). Log `[mascot] fps=… frame=… (push …) max=…`.
 
 ## Chuyển động (lò xo k, c)

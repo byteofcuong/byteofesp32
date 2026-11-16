@@ -86,8 +86,8 @@ constexpr uint16_t kAngry = rgb(0xFF, 0x6A, 0x3A);  // Ám khi giận.
 constexpr uint16_t kWhite = 0xFFFF;
 
 constexpr uint32_t kFrameMs = 33;          // Tối đa ~30 khung/giây.
-constexpr uint32_t kSleepAfterMs = 30000;  // Rảnh, biểu cảm bình thường, để yên 30 giây thì ngủ.
-constexpr int kBandH = 56;                 // Vẽ theo dải 56 dòng.
+// Vẽ theo dải 40 dòng (trước 56): bớt 14KB RAM cho TLS. fps như nhau (quét 2026-11-17: 56 và 40 dòng chênh ≤ 0.9 fps), vì đẩy SPI tính theo số điểm ảnh.
+constexpr int kBandH = 40;
 constexpr int kBandW = 448;                // Bề rộng tối đa vùng vẽ.
 // Ảnh tai: trục xoay đặt tại (kEarOX, kEarOY) trong ảnh; đủ chỗ cho tai nghiêng ±10° và ép 0.7–1.1.
 constexpr int kEarW = 150, kEarH = 124, kEarOX = 75, kEarOY = 100;
@@ -113,6 +113,35 @@ uint16_t mix(uint16_t a, uint16_t b, float k) {
 
 // Vẽ có dịch gốc tọa độ: mọi hình nhận tọa độ màn hình, tự trừ gốc của dải đang vẽ.
 // Hình nằm ngoài dải đang vẽ thì bỏ qua (các hàm làm mịn cạnh tốn công dù bị cắt hết).
+// Màu "độ phủ" để vẽ vào ảnh 8-bit RGB332: đỏ đầy = hình ngoài, vàng = lòng (đỏ đầy + xanh lá đầy).
+constexpr uint16_t kMaskOuter = 0xF800, kMaskInner = 0xFFE0;
+
+// Bảng 256 màu cho byte RGB332 v: độ phủ ngoài a = (v >> 5) / 7, lòng b = ((v >> 2) & 7) / 7.
+// Lưu byte đảo (thứ tự trong bộ đệm sprite 16-bit) để dán bằng phép gán.
+void buildMaskLut(uint16_t* lut, uint16_t bg, uint16_t outer, uint16_t inner) {
+  for (int v = 0; v < 256; ++v) {
+    uint16_t c = mix(mix(bg, outer, (v >> 5) / 7.0f), inner, ((v >> 2) & 7) / 7.0f);
+    lut[v] = (c >> 8) | (c << 8);
+  }
+}
+
+// Dán ảnh độ phủ 8-bit src (w x h) vào sprite 16-bit dst (dw x dh) tại (x0, y0); mirror = lật ngang.
+void blitMask(TFT_eSprite* src, int w, int h, const uint16_t* lut, TFT_eSprite* dst, int dw, int dh, int x0, int y0,
+              bool mirror) {
+  const uint8_t* s = static_cast<const uint8_t*>(src->getPointer());
+  uint16_t* d = static_cast<uint16_t*>(dst->getPointer());
+  const int c0 = max(0, -x0), c1 = min(w, dw - x0);
+  for (int r = max(0, -y0); r < h && y0 + r < dh; ++r) {
+    const uint8_t* srow = s + r * w;
+    uint16_t* drow = d + (y0 + r) * dw + x0;
+    if (mirror) {
+      for (int c = c0; c < c1; ++c) drow[c] = lut[srow[w - 1 - c]];
+    } else {
+      for (int c = c0; c < c1; ++c) drow[c] = lut[srow[c]];
+    }
+  }
+}
+
 struct Canvas {
   TFT_eSprite* s;
   float ox, oy;
@@ -310,6 +339,18 @@ const char* toString(Expression e) {
   return names[static_cast<int>(e)];
 }
 
+void Mascot::end() {
+  TFT_eSprite* all[] = {spr_, ear_spr_, mouth_spr_, arc_spr_[0], arc_spr_[1], badge_spr_};
+  for (TFT_eSprite* s : all) {
+    if (s) {
+      s->deleteSprite();
+      delete s;
+    }
+  }
+  spr_ = ear_spr_ = mouth_spr_ = arc_spr_[0] = arc_spr_[1] = badge_spr_ = nullptr;
+  Serial.printf("[mascot] released, free heap %lu\n", static_cast<unsigned long>(ESP.getFreeHeap()));
+}
+
 bool Mascot::begin(TFT_eSPI& tft) {
   tft_ = &tft;
   initShapes();
@@ -320,25 +361,22 @@ bool Mascot::begin(TFT_eSPI& tft) {
                   static_cast<unsigned long>(ESP.getFreeHeap()));
     return false;
   }
-  for (int i = 0; i < 2; ++i) {
-    ear_spr_[i] = new TFT_eSprite(&tft);
-    ear_spr_[i]->setColorDepth(16);
-    if (ear_spr_[i]->createSprite(kEarW, kEarH) == nullptr) {
-      Serial.println("[mascot] ear sprite failed");
-      return false;
-    }
+  // Một ảnh tai (trái): tai phải là ảnh gương qua trục giữa mặt. Hai ảnh tốn 74KB, WiFi + TLS không còn chỗ
+  // (đo 2026-11-16: còn 89KB, WiFi báo "nvs cfg alloc out of memory").
+  ear_spr_ = new TFT_eSprite(&tft);
+  ear_spr_->setColorDepth(8);  // Ảnh độ phủ (blitMask).
+  if (ear_spr_->createSprite(kEarW, kEarH) == nullptr) {
+    Serial.println("[mascot] ear sprite failed");
+    return false;
   }
   mouth_spr_ = new TFT_eSprite(&tft);
   mouth_spr_->setColorDepth(16);
   bool ok = mouth_spr_->createSprite(kMouthW, kMouthH) != nullptr;
   for (int i = 0; i < 2; ++i) {
     arc_spr_[i] = new TFT_eSprite(&tft);
-    arc_spr_[i]->setColorDepth(16);
+    arc_spr_[i]->setColorDepth(8);  // Ảnh độ phủ (blitMask).
     ok = ok && arc_spr_[i]->createSprite(kArcW, kArcH) != nullptr;
   }
-  badge_spr_ = new TFT_eSprite(&tft);
-  badge_spr_->setColorDepth(16);
-  ok = ok && badge_spr_->createSprite(kBadgeW, kBadgeH) != nullptr;
   if (!ok) {
     Serial.println("[mascot] cache sprite failed");
     return false;
@@ -359,15 +397,21 @@ bool Mascot::begin(TFT_eSPI& tft) {
 }
 
 void Mascot::setState(AssistantState s, uint32_t now) {
+  // Vừa nhận câu hỏi: gật nhẹ một cái cho biết đã nghe (che độ trễ, docs/design/behavior.md).
+  if (s == AssistantState::Thinking && state_ != AssistantState::Thinking) {
+    bob_.v += 150;
+    ear_kick_.v -= 80;
+  }
+  if (s != state_) state_since_ = now;
   state_ = s;
   last_interact_ = now;
   next_look_ = now;
   Serial.printf("[mascot] state=%s\n", toString(s));
 }
 
-void Mascot::setExpression(Expression e, uint32_t now) {
+void Mascot::setExpression(Expression e, uint32_t now, bool interact) {
   expr_ = e;
-  last_interact_ = now;
+  if (interact) last_interact_ = now;
   if (kShapes[static_cast<int>(e)].jump > 0) {  // Biểu cảm mạnh: bật lên khi vào.
     bob_.v -= 200;
     ear_kick_.v += 100;
@@ -376,7 +420,8 @@ void Mascot::setExpression(Expression e, uint32_t now) {
 }
 
 bool Mascot::sleeping(uint32_t now) const {
-  return state_ == AssistantState::Idle && expr_ == Expression::Neutral && now - last_interact_ > kSleepAfterMs;
+  return state_ == AssistantState::Idle && (expr_ == Expression::Neutral || expr_ == Expression::Sleepy) &&
+         now - last_interact_ > sleep_after_ms_;
 }
 
 void Mascot::tap(int32_t x, int32_t y, uint32_t now) {
@@ -461,7 +506,11 @@ void Mascot::update(uint32_t now) {
 
   // Liếc mắt theo trạng thái.
   if (now >= next_look_) {
-    if (state_ == AssistantState::Thinking) { target_gx_ = frand(0.55f, 0.85f); target_gy_ = frand(-0.85f, -0.55f); }
+    if (state_ == AssistantState::Thinking) {  // Liếc lên một bên như đang nghĩ; nghĩ lâu thì đổi bên mỗi 6s.
+      const float side = ((now - state_since_) / 6000) % 2 ? -1.0f : 1.0f;
+      target_gx_ = side * frand(0.55f, 0.85f);
+      target_gy_ = frand(-0.85f, -0.55f);
+    }
     else if (state_ == AssistantState::Listening) { target_gx_ = frand(-0.15f, 0.15f); target_gy_ = -0.1f; }
     else if (asleep_) { target_gx_ = 0; target_gy_ = 0.3f; }
     else {
@@ -569,6 +618,10 @@ void Mascot::update(uint32_t now) {
   }
   {
     const float sm = fmaxf(0, fminf(1, cur_.sm));
+    if (arc_lut_color_ != color_) {
+      arc_lut_color_ = color_;
+      buildMaskLut(arc_lut_, kBg, color_, color_);
+    }
     for (int i = 0; i < 2; ++i) {
       const int side = i == 0 ? -1 : 1;
       const float sc = i == 0 ? cur_.sL : cur_.sR;  // Không theo phối cảnh liếc: đỡ vẽ lại mỗi lần đảo mắt.
@@ -577,11 +630,11 @@ void Mascot::update(uint32_t now) {
       uint32_t key = quantKey({sm, open, sc, (float)color_});
       if (key == arc_key_[i]) continue;
       arc_key_[i] = key;
-      arc_spr_[i]->fillSprite(kBg);
+      arc_spr_[i]->fillSprite(TFT_BLACK);
       Canvas ac{arc_spr_[i], 0, 0, (float)kArcH};
       const float ex = kArcOX, ey = kArcOY, a = cur_.w * sc * 0.4f, end = ey + 12;
       const float apex = ey + 12 - 34 * open * fminf(1, sm * 2);
-      ac.thickQuad(ex - a, end, ex, 2 * apex - end, ex + a, end, 26 * sc, color_);
+      ac.thickQuad(ex - a, end, ex, 2 * apex - end, ex + a, end, 26 * sc, kMaskOuter);
     }
   }
   Box b = frameBox(asleep_);
@@ -608,6 +661,17 @@ void Mascot::update(uint32_t now) {
     tft_->fillRect(0, 4, 4, 312, ec);
     tft_->fillRect(476, 4, 4, 312, ec);
     // Chấm báo to có dấu "!" + hai vòng lan nối tiếp (như điện thoại), vẽ vào ảnh riêng rồi đẩy.
+    // Ảnh chỉ tạo khi đang thông báo (12.7KB, nhường RAM cho TLS lúc thường); không xin được thì chỉ có viền sáng.
+    if (badge_spr_ == nullptr) {
+      badge_spr_ = new TFT_eSprite(tft_);
+      badge_spr_->setColorDepth(16);
+      if (badge_spr_->createSprite(kBadgeW, kBadgeH) == nullptr) {
+        delete badge_spr_;
+        badge_spr_ = nullptr;
+      }
+    }
+  }
+  if (state_ == AssistantState::Notifying && !asleep_ && badge_spr_ != nullptr) {
     badge_spr_->fillSprite(kBg);
     Canvas bc{badge_spr_, (float)kBadgeX, (float)kBadgeY, (float)kBadgeH};
     const float bx = 440, by = 72, pop = 1 + 0.12f * fmaxf(0, sinf(t_ * 2 * PI / 0.8f));
@@ -620,8 +684,15 @@ void Mascot::update(uint32_t now) {
     bc.smoothRect(bx - 2.5f * pop, by - 8 * pop, 5 * pop, 11 * pop, 2.5f * pop, kBg, color_);
     bc.circle(bx, by + 6.5f * pop, 2.6f * pop, kBg, color_);
     badge_spr_->pushSprite(kBadgeX, kBadgeY);
+  }
+  if (state_ == AssistantState::Notifying && !asleep_) {
     edge_lit_ = true;
   } else if (edge_lit_) {
+    if (badge_spr_ != nullptr) {
+      badge_spr_->deleteSprite();
+      delete badge_spr_;
+      badge_spr_ = nullptr;
+    }
     tft_->fillRect(0, 0, 480, 4, kBg);
     tft_->fillRect(0, 316, 480, 4, kBg);
     tft_->fillRect(0, 4, 4, 312, kBg);
@@ -655,11 +726,11 @@ void Mascot::renderEars(float angle, float squash, uint16_t color) {
   ear_key_angle_ = ka;
   ear_key_squash_ = ks;
   ear_key_color_ = color;
-  uint16_t inner = mix(color, kBg, 0.45f);
-  for (int i = 0; i < 2; ++i) {
-    int side = i == 0 ? -1 : 1;
-    TFT_eSprite* s = ear_spr_[i];
-    s->fillSprite(kBg);  // Nền đen, dán thẳng (tai vẽ trước mắt nên không che gì).
+  buildMaskLut(ear_lut_, kBg, color, mix(color, kBg, 0.45f));
+  {  // Chỉ vẽ tai trái; tai phải chép lật gương lúc dán (drawFace).
+    const int side = -1;
+    TFT_eSprite* s = ear_spr_;
+    s->fillSprite(TFT_BLACK);  // Độ phủ 0 = nền (tai vẽ trước mắt nên dán đặc, không che gì).
     // Tọa độ trong ảnh: trục xoay ở (kEarOX, kEarOY).
     Canvas cv{s, (float)(-kEarOX), (float)(-kEarOY), (float)kEarH};
     float px = side < 0 ? kEarPivot[0] : 2 * CX - kEarPivot[0], py = kEarPivot[1];
@@ -670,14 +741,14 @@ void Mascot::renderEars(float angle, float squash, uint16_t color) {
       e[k][0] = x * ca - y * sa;
       e[k][1] = x * sa + y * ca;
     }
-    cv.roundedTri(e, 12, color);
+    cv.roundedTri(e, 12, kMaskOuter);
     float c0 = (e[0][0] + e[1][0] + e[2][0]) / 3, c1 = (e[0][1] + e[1][1] + e[2][1]) / 3 + 10;
     float in[3][2];
     for (int k = 0; k < 3; ++k) {
       in[k][0] = c0 + (e[k][0] - c0) * 0.55f;
       in[k][1] = c1 + (e[k][1] - c1) * 0.55f;
     }
-    cv.roundedTri(in, 7, inner);
+    cv.roundedTri(in, 7, kMaskInner);
   }
 }
 
@@ -694,10 +765,14 @@ void Mascot::drawFace(int ox, int oy, uint32_t now) {
   // ---- Tai: dán ảnh tai đã vẽ sẵn (renderEars), dịch theo hướng nhìn và nhấp nhô ----
   {
     float dx = gx * 0.35f + fx, dy = p.dy + bob + gy * 0.3f;
-    for (int i = 0; i < 2; ++i) {
-      float px = (i == 0 ? kEarPivot[0] : 2 * CX - kEarPivot[0]) + dx, py = kEarPivot[1] + dy;
-      float top = py - kEarOY;
-      if (cv.vis(top, top + kEarH)) ear_spr_[i]->pushToSprite(spr_, cv.X(px - kEarOX), cv.Y(top));
+    float py = kEarPivot[1] + dy, top = py - kEarOY;
+    if (cv.vis(top, top + kEarH)) {
+      blitMask(ear_spr_, kEarW, kEarH, ear_lut_, spr_, kBandW, kBandH, cv.X(kEarPivot[0] + dx - kEarOX), cv.Y(top),
+               false);
+      // Tai phải: ảnh gương. Trục xoay ở cột kEarOX = kEarW/2 nên cột c lật thành kEarW-1-c.
+      static_assert(kEarW == 2 * kEarOX, "ear pivot must sit on the mirror line");
+      blitMask(ear_spr_, kEarW, kEarH, ear_lut_, spr_, kBandW, kBandH, cv.X(2 * CX - kEarPivot[0] + dx - kEarOX),
+               cv.Y(top), true);
     }
   }
 
@@ -736,7 +811,8 @@ void Mascot::drawFace(int ox, int oy, uint32_t now) {
 
     if (sm > 0.01f) {  // Mắt cười: vòm nét dày hai đầu tròn (ảnh đệm vẽ trong update, dán đặc).
       float top = ey - kArcOY;
-      if (cv.vis(top, top + kArcH)) arc_spr_[i]->pushToSprite(spr_, cv.X(ex - kArcOX), cv.Y(top));
+      if (cv.vis(top, top + kArcH))
+        blitMask(arc_spr_[i], kArcW, kArcH, arc_lut_, spr_, kBandW, kBandH, cv.X(ex - kArcOX), cv.Y(top), false);
     }
     if (hrt > 0.01f) {  // Mắt yêu: khối mắt thành trái tim, đập hai nhịp rồi nghỉ; tròng là tim nhỏ tối.
       float ph = fmodf(t, 1.2f) / 1.2f;

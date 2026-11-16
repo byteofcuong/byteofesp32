@@ -40,14 +40,19 @@ constexpr int kShapeFields = sizeof(FaceShape) / sizeof(float);
 class Mascot {
  public:
   bool begin(TFT_eSPI& tft);
+  // Trả mọi ảnh đệm (~150KB) cho WiFi khi vào chế độ cài WiFi; sau đó không vẽ nữa (board khởi động lại sau khi cài).
+  void end();
 
   void setState(AssistantState s, uint32_t now);
-  void setExpression(Expression e, uint32_t now);
+  // interact = false: lớp hành vi tự đổi (chán, buồn ngủ, phai về bình thường), không tính là có người tương tác.
+  void setExpression(Expression e, uint32_t now, bool interact = true);
   AssistantState state() const { return state_; }
   Expression expression() const { return expr_; }
 
   void wake(uint32_t now) { last_interact_ = now; }
+  // Ngủ khi rảnh, mặt bình thường hoặc buồn ngủ, không ai tương tác quá sleep_after_ms (behavior.cpp chỉnh theo giờ).
   bool sleeping(uint32_t now) const;
+  void setSleepAfter(uint32_t ms) { sleep_after_ms_ = ms; }
 
   // Chạm một lần: trúng mắt thì nháy mắt đó; trúng mũi/miệng thì "boop" (híp mắt, nảy);
   // chỗ khác thì đánh mắt nhìn về điểm chạm ~1.8 s, tai giật nhẹ.
@@ -76,17 +81,23 @@ class Mascot {
 
   TFT_eSPI* tft_ = nullptr;
   TFT_eSprite* spr_ = nullptr;
-  TFT_eSprite* ear_spr_[2] = {nullptr, nullptr};
+  TFT_eSprite* ear_spr_ = nullptr;  // Ảnh đệm tai trái; tai phải chép lật gương (đỡ 37KB cho WiFi + TLS).
   TFT_eSprite* mouth_spr_ = nullptr;                 // Ảnh đệm cụm mũi + miệng (khi không nói).
   TFT_eSprite* arc_spr_[2] = {nullptr, nullptr};     // Ảnh đệm vòm mắt cười.
   TFT_eSprite* badge_spr_ = nullptr;                 // Chấm báo khi thông báo: đẩy riêng, ngoài vùng mặt.
   uint32_t mouth_key_ = 0, arc_key_[2] = {0, 0};
   int ear_key_angle_ = 9999, ear_key_squash_ = 0;
   uint16_t ear_key_color_ = 0;
+  // Tai và vòm cười lưu ĐỘ PHỦ 8-bit (đỏ = hình ngoài, xanh lá = lòng tai), dán qua bảng màu pha sẵn (blitMask):
+  // nửa bộ nhớ so với ảnh 16-bit, nhường ~34KB cho bắt tay TLS (2026-11-17).
+  uint16_t ear_lut_[256] = {};
+  uint16_t arc_lut_[256] = {};
+  uint16_t arc_lut_color_ = 0xFFFF;
 
   AssistantState state_ = AssistantState::Idle;
   Expression expr_ = Expression::Neutral;
   uint32_t last_interact_ = 0, last_frame_ = 0;
+  uint32_t sleep_after_ms_ = 180000, state_since_ = 0;
 
   Spring shape_[kShapeFields];
   Spring gx_, gy_, tilt_, bob_, ear_kick_, talk_s_;

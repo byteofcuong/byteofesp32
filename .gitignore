@@ -21,3 +21,6 @@ venv/
 
 # Model tải về (Whisper, Piper, openWakeWord)
 models/
+
+# Bí mật firmware (WiFi, token): mẫu là secrets.example.h
+firmware/include/secrets.h

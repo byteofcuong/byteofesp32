@@ -63,6 +63,10 @@ classDiagram
 | SpeechToText | process | Đổi giọng nói thành chữ | STT, faster-whisper | [assistant.md:15](docs/design/assistant.md#L15) |
 | TextToSpeech | process | Đổi câu trả lời thành âm thanh | TTS, Piper | [assistant.md:15](docs/design/assistant.md#L15) |
 | ApiKey | concept | Bí mật gọi BrainProvider, chỉ ở server | key | [0001-thin-client-home-server.md:13](docs/decisions/0001-thin-client-home-server.md#L13) |
+| Behavior | process | Lớp quyết biểu cảm: lệnh server có hold rồi phai, phản xạ chạm, chán → buồn ngủ → ngủ | lớp hành vi, phản xạ | [behavior.hpp](firmware/src/behavior.hpp), [behavior.md](docs/design/behavior.md) |
+| WifiSetup | process | Trang cài WiFi: board phát WiFi riêng, người dùng chọn mạng bằng điện thoại | captive portal, portal | [portal.hpp](firmware/src/portal.hpp) |
+| ServerTunnel | config | Cloudflare Tunnel cho server địa chỉ wss:// trên Internet | Cloudflare Tunnel, cloudflared | [0008](docs/decisions/0008-portable-board-tunnel-tls.md) |
+| DeviceToken | concept | Chuỗi ngẫu nhiên chung giữa board và server, gửi trong lời chào | DEVICE_TOKEN | [protocol.md](docs/design/protocol.md) |
 | Muse2Api | process | Dịch vụ bên thứ ba chạy riêng trên máy server, đóng gói web muse.ai thành API kiểu OpenAI | muse2api | [0006-muse-via-muse2api.md](docs/decisions/0006-muse-via-muse2api.md) |
 
 ## 4. Quan hệ
@@ -75,7 +79,10 @@ classDiagram
 | speaker_plugs_into | Speaker → Connector | N:1 | SPEAK1 |
 | battery_plugs_into | Battery → Connector | N:1 | BAT1 |
 | device_runs_on_board | Device → Board | 1:1 | Thiết kế trợ lý |
-| device_streams_to_server | Device → HomeServer | N:1 | WebSocket trong mạng nhà |
+| device_streams_to_server | Device → HomeServer | N:1 | WebSocket; ngoài nhà qua ServerTunnel (wss://) |
+| behavior_drives_mascot | Behavior → Mascot | 1:1 | `setState`/`setExpression`, không còn chạm đổi trực tiếp |
+| device_uses_tunnel | Device → ServerTunnel | N:1 | `server_url` trong NVS |
+| device_authenticates_with_token | Device → DeviceToken | 1:1 | Lời chào `hello` |
 | device_shows_mascot | Device → Mascot | 1:1 | Thiết kế trợ lý |
 | server_uses_provider | HomeServer → BrainProvider | N:1 | Cấu hình `brain` |
 | server_holds_apikey | HomeServer → ApiKey | 1:N | `server/.env` |
@@ -122,6 +129,9 @@ Giá trị khác (enum): `BrainProviderName` = muse, claude; `ActivationMethod` 
 | R8 | Thông tin tài khoản chỉ ở docs/private | [AGENTS.md:48](AGENTS.md#L48) | Chưa có |
 | R9 | Màn dùng TFT_eSPI; cảm ứng chỉ coi là chạm khi PENIRQ (GPIO36) thấp, không dùng `getTouch()` của TFT_eSPI | [touch.cpp:122](firmware/src/touch.cpp#L122), [AGENTS.md:45](AGENTS.md#L45) | `touch::verify()` in `[touchtest] worst=` (bán tự động, cần người chạm) |
 | R10 | muse2api chạy ngoài repo, chỉ mở cổng 127.0.0.1, ghim commit đã đọc; cookie không commit | [0006](docs/decisions/0006-muse-via-muse2api.md) | Chưa có |
+| R11 | Server chỉ nghe 127.0.0.1; board vào qua Cloudflare Tunnel bằng wss:// + DeviceToken | [config.py](server/byteof/config.py), [0008](docs/decisions/0008-portable-board-tunnel-tls.md) | Chưa có |
+| R12 | Linh vật giữ RAM ~87KB để WiFi + TLS còn chỗ; thêm ảnh đệm phải đo lại heap | [0008](docs/decisions/0008-portable-board-tunnel-tls.md) | Số đo `heap=` trong log `[link]` (thủ công) |
+| R13 | Không cử chỉ chạm nào đổi biểu cảm/trạng thái trực tiếp; cảm xúc server kèm hold rồi phai | [behavior.md](docs/design/behavior.md) | `test_turn_sequence` (server); phía board thủ công |
 
 ## 7. Phát hiện
 - Tên gọi trôi: người bán gọi board là "2.8 inch"; nghiên cứu ban đầu dùng "CYD ESP32-2432S028R"; đúng là ESP32-3248S035R. Mọi tài liệu mới dùng tên đúng.

@@ -1,16 +1,21 @@
 // Firmware linh vật (docs/design/mascot/spec.md). Log qua Serial 115200 (firmware/tools/serial_log.py).
 //
-// Cảm ứng (sau này server điều khiển trạng thái và biểu cảm; chạm vẫn là tương tác):
-//   chạm 1 lần            -> tương tác: trúng mắt thì nháy, trúng mũi thì "boop", chỗ khác thì nhìn theo
-//   chạm 2 lần liên tiếp  -> biểu cảm tiếp theo
-//   giữ 0,6–5 giây        -> trạng thái trợ lý tiếp theo
+// Trạng thái và biểu cảm tự xuất hiện (docs/design/behavior.md, src/behavior.*): server quyết theo hội thoại,
+// board tự phản xạ khi chạm và tự chán/buồn ngủ/ngủ khi rảnh. Không còn chạm để đổi biểu cảm hay trạng thái.
+// Cảm ứng (xử lý tại chỗ, báo lên server):
+//   chạm                  -> trúng mắt thì nháy, trúng mũi thì "boop", chỗ khác thì nhìn theo;
+//                            chạm vài lần liền là vuốt ve (vui), chọc liên tục thì khó chịu
+//   giữ 0,6–5 giây        -> xoa đầu (thương; xoa liền nữa thì ngượng); sau này dùng cho bấm-để-nói
 //   giữ trên 5 giây       -> hiệu chỉnh lại cảm ứng
-//   chạm lúc đang ngủ     -> chỉ đánh thức
+//   chạm lúc đang ngủ     -> giật mình rồi ngái ngủ
 #include <Arduino.h>
 #include <TFT_eSPI.h>
 
+#include "behavior.hpp"
 #include "board_cyd35.hpp"
 #include "mascot.hpp"
+#include "net_config.hpp"
+#include "server_link.hpp"
 #include "touch.hpp"
 
 namespace {
@@ -21,7 +26,6 @@ Mascot mascot;
 constexpr uint32_t kLongPressMs = 600;
 constexpr uint32_t kCalibratePressMs = 5000;
 constexpr uint32_t kReleaseDebounceMs = 40;  // PENIRQ có thể chập chờn khi lực ấn đổi.
-constexpr uint32_t kDoubleTapMs = 350;       // Hai lần chạm nhả cách nhau dưới mức này là chạm đôi.
 
 void setLed(bool r, bool g, bool b) {
   // LED chung anode: LOW là sáng.
@@ -56,7 +60,6 @@ void handleTouch(uint32_t now) {
   static uint32_t down_at = 0, last_seen = 0;
   static int32_t x = 0, y = 0;
   static bool have_xy = false, consumed = false;
-  static uint32_t last_tap = 0;  // Lúc nhả lần chạm nhanh trước (0 = không có).
 
   if (touch::pressed()) {
     last_seen = now;
@@ -66,7 +69,7 @@ void handleTouch(uint32_t now) {
       have_xy = false;
       consumed = mascot.sleeping(now);  // Chạm lúc ngủ chỉ để đánh thức.
       mascot.wake(now);
-      if (consumed) Serial.println("[mascot] woke up");
+      if (consumed) behavior::onWake(now);
     }
     if (!have_xy) have_xy = touch::read(&x, &y);
     if (!consumed && now - down_at > kCalibratePressMs) {
@@ -83,17 +86,11 @@ void handleTouch(uint32_t now) {
   down = false;
   if (consumed) return;
   if (last_seen - down_at < kLongPressMs) {
-    // Chạm 1 lần tương tác ngay (không chờ xem có chạm đôi không, cho nhạy); chạm đôi thì đổi biểu cảm thêm.
-    if (last_tap != 0 && now - last_tap < kDoubleTapMs) {
-      mascot.setExpression(next(mascot.expression()), now);
-      last_tap = 0;
-    } else {
-      if (have_xy) mascot.tap(x, y, now);
-      last_tap = now;
-    }
+    if (have_xy) behavior::onTap(x, y, now);
+    server_link::sendTouch("tap");
   } else {
-    mascot.setState(next(mascot.state()), now);
-    last_tap = 0;
+    behavior::onHold(now);
+    server_link::sendTouch("long");
   }
 }
 
@@ -122,22 +119,113 @@ void setup() {
     tft.setTextColor(TFT_RED, TFT_BLACK);
     tft.drawString("Khong du RAM cho linh vat", 20, 20, 2);
   }
+  behavior::begin(&mascot);
   Serial.println("[ready] mascot");
+  server_link::begin();  // Sau khi linh vật đã giữ RAM cho sprite.
 }
 
-// Lệnh thử qua Serial: 'e' biểu cảm tiếp theo, 's' trạng thái tiếp theo (đo fps từng biểu cảm bằng script).
+// Lệnh từ server (ADR 0007) qua lớp hành vi: biểu cảm có thể kèm thời gian giữ rồi phai (docs/design/behavior.md).
+void applyServerCommands(uint32_t now) {
+  server_link::Command cmd;
+  while (server_link::poll(&cmd)) {
+    if (cmd.kind == server_link::Command::Kind::State) {
+      behavior::onServerState(static_cast<AssistantState>(cmd.value), now);
+    } else {
+      behavior::onServerExpression(static_cast<Expression>(cmd.value), cmd.hold_ms, now);
+    }
+  }
+  server_link::report(mascot.state(), mascot.expression());
+}
+
+// Một dòng trạng thái mạng ở mép trên (y 4–22, ngoài vùng mặt từ y 24 và viền thông báo 4px), chỉ vẽ khi đổi.
+// Chữ không dấu: font có sẵn của TFT_eSPI không có tiếng Việt.
+void drawNetStatus(uint32_t now) {
+  using server_link::Status;
+  static int shown = -1;
+  static uint32_t since = 0;
+  static Status last = Status::Offline;
+  Status s = server_link::status();
+  if (s != last) {
+    last = s;
+    since = now;
+  }
+  char line[80] = "";
+  switch (s) {
+    case Status::Setup:
+      snprintf(line, sizeof(line), "Cai WiFi: dien thoai vao mang %s, mat khau %s", server_link::setupSsid(),
+               server_link::setupPass());
+      break;
+    case Status::Joining:
+      if (now - since > 3000) snprintf(line, sizeof(line), "Dang vao WiFi...");
+      break;
+    case Status::NoServer:
+      if (now - since > 6000) snprintf(line, sizeof(line), "Co WiFi, chua noi duoc server");
+      break;
+    default:
+      break;
+  }
+  int key = line[0] == 0 ? 0 : static_cast<int>(s) + 1;
+  if (key == shown) return;
+  shown = key;
+  tft.fillRect(6, 4, 468, 18, TFT_BLACK);
+  if (line[0]) {
+    tft.setTextColor(0x8C51, TFT_BLACK);  // Xám ấm, không tranh với linh vật.
+    tft.setTextDatum(TC_DATUM);
+    tft.drawString(line, 240, 5, 2);
+  }
+}
+
+// Lệnh thử qua Serial: 'e' biểu cảm tiếp theo, 's' trạng thái tiếp theo (đo fps từng biểu cảm bằng script),
+// 'w' mở trang cài WiFi, 'W' xóa mọi WiFi và địa chỉ server đã lưu rồi mở trang cài WiFi.
 void handleSerial(uint32_t now) {
   while (Serial.available() > 0) {
     int c = Serial.read();
-    if (c == 'e') mascot.setExpression(next(mascot.expression()), now);
-    if (c == 's') mascot.setState(next(mascot.state()), now);
+    // Đi qua lớp hành vi như lệnh server: lớp rảnh không chen vào giữa lúc đo (chán, buồn ngủ).
+    if (c == 'e') behavior::onServerExpression(next(mascot.expression()), 0, now);
+    if (c == 's') behavior::onServerState(next(mascot.state()), now);
+    if (c == 'W') net_config::clear();
+    if (c == 'w' || c == 'W') server_link::requestSetup();
   }
+}
+
+// Chế độ cài WiFi: trả RAM của linh vật cho WiFi và hiện hướng dẫn cố định (chữ không dấu: font không có tiếng Việt).
+bool setupScreen() {
+  static bool shown = false;
+  if (server_link::status() != server_link::Status::Setup) return false;
+  if (shown) return true;
+  shown = true;
+  mascot.end();
+  setLed(false, false, true);
+  tft.fillScreen(TFT_BLACK);
+  tft.setTextDatum(TL_DATUM);
+  tft.setTextColor(0xFCC7, TFT_BLACK);  // Cam như con cáo.
+  tft.drawString("Cai WiFi cho con cao", 24, 24, 4);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  char buf[64];
+  snprintf(buf, sizeof(buf), "1. Dien thoai vao WiFi:  %s", server_link::setupSsid());
+  tft.drawString(buf, 24, 84, 2);
+  snprintf(buf, sizeof(buf), "2. Mat khau:  %s", server_link::setupPass());
+  tft.drawString(buf, 24, 114, 2);
+  tft.drawString("3. Trang cai tu mo. Neu khong, mo trinh duyet: 192.168.4.1", 24, 144, 2);
+  tft.drawString("4. Chon WiFi nha, nhap mat khau, bam Luu.", 24, 174, 2);
+  tft.setTextColor(0x8C51, TFT_BLACK);
+  tft.drawString("Luu xong board tu khoi dong lai va vao mang.", 24, 230, 2);
+  server_link::setupMemoryReleased();
+  return true;
 }
 
 void loop() {
   uint32_t now = millis();
+  if (setupScreen()) {
+    handleSerial(now);
+    delay(20);
+    return;
+  }
   handleSerial(now);
+  applyServerCommands(now);
   handleTouch(now);
+  behavior::update(now);
   updateLed(now);
   mascot.update(now);
+  drawNetStatus(now);
 }

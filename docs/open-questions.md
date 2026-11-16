@@ -14,4 +14,4 @@
 | Q8 | Piper có giọng tiếng Việt đủ nghe không; cần TTS cloud không | Thử trên PC | Mở |
 | Q9 | Chọn framework firmware: Arduino/PlatformIO hay ESP-IDF | ADR khi bắt đầu viết firmware | **Đã trả lời 2026-11-16: ADR 0005** (PlatformIO + Arduino + TFT_eSPI) |
 | Q11 | Vì sao LovyanGFX 1.3.0 hiện sai màu trên tấm màn này | So từng lệnh khởi tạo với TFT_eSPI (bắt SPI hoặc đọc mã) | Mở, chỉ cần nếu sau này muốn dùng LovyanGFX |
-| Q10 | Server chạy ở đâu: PC (chỉ khi bật) hay máy 24/7 | Người dùng quyết | Mở |
+| Q10 | Server chạy ở đâu: PC (chỉ khi bật) hay máy 24/7 | Người dùng quyết | **Đã trả lời 2026-11-16: ADR 0008** (PC ở nhà bật suốt + Cloudflare Tunnel + tên miền riêng) |

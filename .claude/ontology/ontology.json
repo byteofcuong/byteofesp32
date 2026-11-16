@@ -607,6 +607,94 @@
           "symbol": "- `muse2api` chạy **ngoài repo này**"
         }
       ]
+    },
+    {
+      "id": "WifiSetup",
+      "kind": "process",
+      "area": "system",
+      "parent": null,
+      "label": {
+        "en": "WiFi setup portal",
+        "vi": "Trang cài WiFi"
+      },
+      "synonyms": [
+        "captive portal",
+        "portal",
+        "byteof-XXXX"
+      ],
+      "definition": "Board không vào được WiFi đã lưu thì phát WiFi riêng và trang cài ở 192.168.4.1; người dùng chọn mạng bằng điện thoại, board lưu vào NVS rồi khởi động lại.",
+      "evidence": [
+        {
+          "file": "firmware/src/portal.hpp",
+          "symbol": "void start(const String& ap_ssid"
+        }
+      ]
+    },
+    {
+      "id": "ServerTunnel",
+      "kind": "config",
+      "area": "system",
+      "parent": null,
+      "label": {
+        "en": "Server tunnel",
+        "vi": "Đường hầm tới server"
+      },
+      "synonyms": [
+        "Cloudflare Tunnel",
+        "cloudflared",
+        "wss://"
+      ],
+      "definition": "Cloudflare Tunnel cho HomeServer một địa chỉ wss:// trên Internet; cloudflared trên PC chuyển vào ws://127.0.0.1:8765.",
+      "evidence": [
+        {
+          "file": "docs/decisions/0008-portable-board-tunnel-tls.md",
+          "symbol": "- **Đường tới server:**"
+        }
+      ]
+    },
+    {
+      "id": "DeviceToken",
+      "kind": "concept",
+      "area": "system",
+      "parent": null,
+      "label": {
+        "en": "Device token",
+        "vi": "Token thiết bị"
+      },
+      "synonyms": [
+        "DEVICE_TOKEN",
+        "BYTEOF_DEVICE_TOKEN"
+      ],
+      "definition": "Chuỗi ngẫu nhiên dùng chung giữa board (secrets.h) và server (server/.env); board gửi trong lời chào, sai thì server đóng kết nối.",
+      "evidence": [
+        {
+          "file": "docs/design/protocol.md",
+          "symbol": "## Chào hỏi"
+        }
+      ]
+    },
+    {
+      "id": "Behavior",
+      "kind": "process",
+      "area": "system",
+      "parent": null,
+      "label": {
+        "en": "Mascot behavior",
+        "vi": "Hành vi linh vật"
+      },
+      "synonyms": [
+        "behavior layer",
+        "lớp hành vi",
+        "phản xạ",
+        "đời sống khi rảnh"
+      ],
+      "definition": "Lớp trên Mascot quyết biểu cảm nào hiện lúc nào: lệnh server có thời gian giữ rồi phai, phản xạ chạm khi rảnh, chán → buồn ngủ → ngủ khi không ai tương tác.",
+      "evidence": [
+        {
+          "file": "firmware/src/behavior.hpp",
+          "symbol": "void onServerExpression(Expression e, uint32_t hold_ms, uint32_t now);"
+        }
+      ]
     }
   ],
   "relations": [
@@ -706,7 +794,7 @@
       "from": "Device",
       "to": "HomeServer",
       "cardinality": "N:1",
-      "definition": "Device stream âm thanh mic và sự kiện chạm lên HomeServer qua WebSocket trong mạng nhà.",
+      "definition": "Device gửi sự kiện chạm (sau này âm thanh mic) lên HomeServer qua WebSocket; ngoài nhà đi qua ServerTunnel bằng wss://.",
       "evidence": [
         {
           "file": "docs/design/assistant.md",
@@ -802,6 +890,45 @@
         {
           "file": "docs/decisions/0006-muse-via-muse2api.md",
           "symbol": "`base_url = http://127.0.0.1:18610/v1`"
+        }
+      ]
+    },
+    {
+      "id": "device_uses_tunnel",
+      "from": "Device",
+      "to": "ServerTunnel",
+      "cardinality": "N:1",
+      "definition": "Device vào HomeServer qua địa chỉ wss:// của đường hầm, lưu trong NVS.",
+      "evidence": [
+        {
+          "file": "firmware/src/net_config.hpp",
+          "symbol": "String server_url;"
+        }
+      ]
+    },
+    {
+      "id": "device_authenticates_with_token",
+      "from": "Device",
+      "to": "DeviceToken",
+      "cardinality": "1:1",
+      "definition": "Lời chào hello mang token.",
+      "evidence": [
+        {
+          "file": "firmware/src/server_link.cpp",
+          "symbol": "doc[\"token\"] = BYTEOF_DEVICE_TOKEN;"
+        }
+      ]
+    },
+    {
+      "id": "behavior_drives_mascot",
+      "from": "Behavior",
+      "to": "Mascot",
+      "cardinality": "1:1",
+      "definition": "Behavior gọi setState/setExpression của Mascot; không còn chạm để đổi trực tiếp.",
+      "evidence": [
+        {
+          "file": "docs/design/behavior.md",
+          "symbol": "## Ba lớp, ưu tiên từ trên xuống"
         }
       ]
     }
@@ -1179,6 +1306,55 @@
         }
       ],
       "tested_by": []
+    },
+    {
+      "id": "R11",
+      "statement": "HomeServer chỉ nghe 127.0.0.1; board vào từ ngoài qua Cloudflare Tunnel bằng wss:// và DeviceToken.",
+      "applies_to": [
+        "HomeServer",
+        "ServerTunnel"
+      ],
+      "enforced_by": [
+        {
+          "file": "server/byteof/config.py",
+          "symbol": "os.environ.get(\"BYTEOF_HOST\", \"127.0.0.1\")"
+        }
+      ],
+      "tested_by": []
+    },
+    {
+      "id": "R12",
+      "statement": "Linh vật giữ RAM vừa đủ (~87KB) để WiFi + bắt tay TLS còn chỗ; thêm ảnh đệm phải đo lại heap trong log [link].",
+      "applies_to": [
+        "Mascot"
+      ],
+      "enforced_by": [
+        {
+          "file": "docs/decisions/0008-portable-board-tunnel-tls.md",
+          "symbol": "- **RAM cho TLS**"
+        }
+      ],
+      "tested_by": []
+    },
+    {
+      "id": "R13",
+      "statement": "Không có cử chỉ chạm nào đổi biểu cảm hay trạng thái trực tiếp; cảm xúc từ server kèm hold rồi tự phai về neutral.",
+      "applies_to": [
+        "Behavior",
+        "Mascot"
+      ],
+      "enforced_by": [
+        {
+          "file": "docs/design/behavior.md",
+          "symbol": "Thay cho việc chạm để đổi biểu cảm"
+        }
+      ],
+      "tested_by": [
+        {
+          "file": "server/tests/test_hub.py",
+          "symbol": "def test_turn_sequence"
+        }
+      ]
     }
   ]
 }
