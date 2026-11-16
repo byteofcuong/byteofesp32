@@ -958,9 +958,18 @@
       "values": [
         "neutral",
         "happy",
+        "laugh",
+        "excited",
+        "love",
+        "shy",
+        "smug",
         "sad",
+        "cry",
         "angry",
         "surprised",
+        "scared",
+        "confused",
+        "bored",
         "sleepy"
       ],
       "evidence": [

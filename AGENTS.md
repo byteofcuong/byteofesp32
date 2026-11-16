@@ -18,7 +18,7 @@ Trợ lý giọng nói để bàn (kiểu Meta Muse Charm) chạy trên board **
 
 ## Layout
 - `docs/`: kho kiến thức (xem trên).
-- `firmware/`: PlatformIO project (`platformio.ini` chứa chân màn/cảm ứng, `src/main.cpp`, `src/mascot.*` linh vật, `src/touch.*` cảm ứng, `include/board_cyd35.hpp`, `tools/serial_log.py`).
+- `firmware/`: PlatformIO project (`platformio.ini` chứa chân màn/cảm ứng, `src/main.cpp`, `src/mascot.*` linh vật, `src/touch.*` cảm ứng, `include/board_cyd35.hpp`, `tools/serial_log.py`, `tools/fps_sweep.py`).
 - `server/`: chưa tạo.
 - `backups/`: bản sao lưu flash gốc (git bỏ qua).
 - `.claude/`: skill `handoff`; hook bàn giao (SessionStart nạp bản bàn giao, Stop nhắc khi bàn giao cũ, PreCompact); ontology.
@@ -31,9 +31,10 @@ python .claude/hooks/test_handoff_hooks.py   # test các hook bàn giao
 ```
 Firmware (chạy từ `firmware/`, cần board cắm COM5 cho hai lệnh sau):
 ```
-python -m platformio run -e cyd35              # SUCCESS, RAM ~7%, flash ~26%
+python -m platformio run -e cyd35              # SUCCESS, RAM ~8%, flash ~27.5%
 python -m platformio run -e cyd35 -t upload    # nạp lên board, SUCCESS
-python tools/serial_log.py COM5 8              # reset board, in log: [lcd] init ok 480x320, [ready] mascot, [mascot] fps≈27–30
+python tools/serial_log.py COM5 8              # reset board, in log: [lcd] init ok 480x320, [ready] mascot, [mascot] fps≈30 max=…
+python tools/fps_sweep.py COM5                 # ~2.5 phút: fps + khung chậm nhất từng biểu cảm/trạng thái (23.6–30.3 fps, max khi chuyển ≤ 52ms)
 ```
 Chưa có test tự động cho firmware. Phần nhìn (màu, cảm ứng) phải nhờ người dùng xác nhận; cảm ứng có số đo `[touchtest] worst=` sau khi bấm "CAN CHINH". Khi đang ghi log, đừng nạp (cổng COM5 bận).
 

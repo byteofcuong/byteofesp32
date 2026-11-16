@@ -105,7 +105,7 @@ stateDiagram-v2
   running --> failed : lỗi
 ```
 
-Giá trị khác (enum): `BrainProviderName` = muse, claude; `ActivationMethod` = touch, wake_word; `Expression` = neutral, happy, sad, angry, surprised, sleepy ([mascot.hpp:12](firmware/src/mascot.hpp#L12)).
+Giá trị khác (enum): `BrainProviderName` = muse, claude; `ActivationMethod` = touch, wake_word; `Expression` = neutral, happy, laugh, excited, love, shy, smug, sad, cry, angry, surprised, scared, confused, bored, sleepy ([mascot.hpp:12](firmware/src/mascot.hpp#L12)).
 
 ## 6. Quy tắc
 | ID | Quy tắc | Ghi ở | Test |

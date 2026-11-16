@@ -1,39 +1,55 @@
 ---
 date: 2026-11-16
-branch: main
-commit: 8c5b4f2
+branch: feature/expressions
+commit: (xem git log của nhánh)
 ---
 # Handoff
 
 ## Mục tiêu
-Trợ lý giọng nói để bàn trên board ESP32-3248S035R. Bước 1 của lộ trình (linh vật trên màn) **đã xong**: người dùng chốt thiết kế và xác nhận trên màn thật là liền mạch, sạch, mượt.
+Trợ lý giọng nói để bàn trên board ESP32-3248S035R. Bước 1 (linh vật trên màn) xong. Phần đại tu biểu cảm cũng đã xong và người dùng duyệt trên màn thật ("Ổn, commit").
 
 ## Trạng thái
-- `main` đã có và đã push: firmware màn + cảm ứng + linh vật (`firmware/src/main.cpp`, `mascot.*`, `touch.*`), đặc tả và bản mẫu linh vật (`docs/design/mascot/`), ontology.
-- Linh vật: hai mắt robot có **con ngươi khe dọc**, **tai cáo đặc lòng sẫm**, mũi tam giác, miệng ω, màu cam khi rảnh; 5 trạng thái trợ lý, 6 biểu cảm; chuyển động bằng lò xo; 30 fps.
-- Thử trên board: chạm mắt = nháy mắt; chạm chỗ khác = đổi trạng thái; giữ 1 giây = đổi biểu cảm; giữ 5 giây = hiệu chỉnh cảm ứng; để yên 30 giây = ngủ.
-- `AGENTS.md` đã cập nhật trạng thái dự án (trước đó vẫn ghi "chưa có code").
-- Nhánh `firmware/display-touch`, `feature/fox-mascot` còn ở máy, đã merge, xóa được. Sao lưu flash gốc ở `backups/factory_backup.bin` (git bỏ qua).
+- Nhánh `feature/expressions` (đã commit, **chưa merge, chưa push**).
+- Có 15 biểu cảm: neutral, happy, laugh, excited, love, shy, smug, sad, cry, angry, surprised, scared, confused, bored, sleepy.
+- Bộ thông số đầy đủ, quy tắc thiết kế và những phương án đã bị chê nằm trong `docs/design/mascot/spec.md`. Bản mẫu là `docs/design/mascot/prototype.html`.
+- Cử chỉ chạm trên board:
+  - chạm 1 lần: tương tác (mắt thì nháy, mũi thì "boop", chỗ khác thì nhìn theo);
+  - chạm 2 lần: đổi biểu cảm;
+  - giữ 0.6–5 s: đổi trạng thái;
+  - giữ > 5 s: hiệu chỉnh cảm ứng.
+- Thông báo: viền màn hình sáng nhấp nháy + chấm báo "!" + nhún, vẫy tai.
+- Lệnh Serial `e`/`s` để đổi biểu cảm/trạng thái (dùng cho đo fps, sau này cho server).
 
 ## Quyết định
-- ADR 0005: PlatformIO + Arduino + TFT_eSPI; cảm ứng tự đọc kiểu LovyanGFX (PENIRQ GPIO36, trung vị 7 lượt); SPI 80MHz.
-- Thiết kế linh vật: xem `docs/design/mascot/spec.md` (có mục chống đụng hàng với Cozmo/Vector/EMO và danh sách phương án đã loại). Mọi thay đổi hình: sửa `prototype.html`, tự chụp và soi trước khi đưa người dùng.
-- Đã loại, đừng thử lại: LovyanGFX cho màn (sai màu); `getTouch` của TFT_eSPI; sprite 8-bit (hình thô); nét làm mịn pha với màu cố định (vết cắt); vẽ tai mỗi khung (36ms).
-- Commit message: một câu tiếng Anh, không dấu vết AI.
+- Miệng giữ khung ω, chỉ biến tấu bằng phụ kiện. Mắt dùng mí cắt cong. Đơn sắc, không ký hiệu emoji.
+- Vòm cười và mắt tim chuyển gần như tức thì. Các thông số khác dùng lò xo k300 c30.
+- Hình nặng được vẽ vào ảnh đệm (tai, cụm miệng, vòm cười), chỉ vẽ lại khi đổi. Không dùng nét dày `drawWideLine` lớn.
+- Các nhánh cũ `firmware/display-touch`, `feature/fox-mascot` đã merge, xóa được.
 
 ## Việc tiếp theo
-1. Bước 2 lộ trình: nối board với server Python trên PC qua WiFi + WebSocket để server điều khiển trạng thái và biểu cảm linh vật (chưa cần âm thanh).
-2. Khi người dùng có loa: thử phát âm thanh qua DAC GPIO26, nhép miệng theo biên độ.
-3. Chờ người dùng: mua loa, mic INMP441, pin; ảnh rõ mã chip 8 chân cạnh `2R2` (Q1), đo cổng BAT1 (Q2), token Muse có API key không (Q6). Chưa hỏi người dùng về Codex.
+1. Hỏi người dùng: merge `feature/expressions` vào `main` và push.
+2. Bước 2 lộ trình: nối board với server Python trên PC qua WiFi + WebSocket, server gửi trạng thái và biểu cảm. Lệnh Serial `e`/`s` là tiền đề cho giao thức này.
+3. Khi có loa: phát âm thanh qua DAC GPIO26, miệng D há theo biên độ thật thay cho nhịp giả.
+4. Chờ người dùng:
+   - mua loa, mic INMP441, pin;
+   - Q1: ảnh mã chip 8 chân cạnh `2R2`;
+   - Q2: đo cổng BAT1;
+   - Q6: token Muse có API key không.
+   - Chưa hỏi người dùng về Codex.
 
-## Kiểm chứng
-- `cd firmware && python -m platformio run -e cyd35 -t upload`: SUCCESS (RAM ~7%, flash ~26%).
-- `python firmware/tools/serial_log.py COM5 8`: `[ready] mascot`, `[mascot] fps=27.4–30.0 frame=32–35ms (push 25ms) heap=198920`.
-- Ontology check: `errors=0 warnings=8`. `python .claude/hooks/test_handoff_hooks.py`: OK.
-- Người dùng xác nhận trên màn thật: liền mạch, sạch, mượt (2026-11-16).
+## Kiểm chứng (2026-11-16, trên nhánh)
+- `cd firmware && python -m platformio run -e cyd35 -t upload`: SUCCESS. RAM 7.9%, flash 27.5%.
+- Quét fps qua Serial (gửi `e`/`s`, đọc `[mascot] fps=… max=…`):
+  - 23.6 (cry) đến 30.3 fps;
+  - khung chậm nhất khi chuyển biểu cảm 41–52ms;
+  - notifying 24.1 fps;
+  - heap còn ~138KB.
+- Ontology check `errors=0`. `python .claude/hooks/test_handoff_hooks.py`: OK. Kết quả thật xem lệnh chạy khi commit.
+- Người dùng xác nhận trên màn thật: ổn.
 
 ## Rủi ro
-- SPI 80MHz vượt mức thông dụng 40MHz; đang chạy sạch nhưng nếu màn nhiễu thì hạ về 40MHz (giảm còn ~19 fps).
-- Lịch sử `main` đã viết lại và force push một lần (2026-11-16); bản cũ ở `refs/original/` trên máy.
-- `serial_log.py` reset board qua RTS khi mở cổng; khi nó đang chạy thì không nạp được.
-- Q11: chưa rõ vì sao LovyanGFX sai màu, chỉ cần nếu sau này muốn dùng LovyanGFX cho LVGL.
+- Push SPI ~26ms/khung là trần (~30 fps); thêm vùng vẽ là tụt fps ngay.
+- Lịch sử `main` từng viết lại và force push một lần.
+- `serial_log.py` và script đo mở COM5 sẽ reset board; khi chúng chạy thì không nạp được.
+- Q11: chưa rõ vì sao LovyanGFX sai màu.
+- Quét fps: `cd firmware && python tools/fps_sweep.py COM5` (mất ~2.5 phút, mở COM5 nên reset board).

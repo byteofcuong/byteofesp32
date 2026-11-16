@@ -1,9 +1,9 @@
 // Firmware linh vật (docs/design/mascot/spec.md). Log qua Serial 115200 (firmware/tools/serial_log.py).
 //
-// Cảm ứng (để thử, sau này server điều khiển trạng thái và biểu cảm):
-//   chạm nhanh vào mắt   -> nháy mắt đó, nảy lên
-//   chạm nhanh chỗ khác  -> trạng thái trợ lý tiếp theo
-//   giữ 0,6–5 giây        -> biểu cảm tiếp theo
+// Cảm ứng (sau này server điều khiển trạng thái và biểu cảm; chạm vẫn là tương tác):
+//   chạm 1 lần            -> tương tác: trúng mắt thì nháy, trúng mũi thì "boop", chỗ khác thì nhìn theo
+//   chạm 2 lần liên tiếp  -> biểu cảm tiếp theo
+//   giữ 0,6–5 giây        -> trạng thái trợ lý tiếp theo
 //   giữ trên 5 giây       -> hiệu chỉnh lại cảm ứng
 //   chạm lúc đang ngủ     -> chỉ đánh thức
 #include <Arduino.h>
@@ -21,6 +21,7 @@ Mascot mascot;
 constexpr uint32_t kLongPressMs = 600;
 constexpr uint32_t kCalibratePressMs = 5000;
 constexpr uint32_t kReleaseDebounceMs = 40;  // PENIRQ có thể chập chờn khi lực ấn đổi.
+constexpr uint32_t kDoubleTapMs = 350;       // Hai lần chạm nhả cách nhau dưới mức này là chạm đôi.
 
 void setLed(bool r, bool g, bool b) {
   // LED chung anode: LOW là sáng.
@@ -55,6 +56,7 @@ void handleTouch(uint32_t now) {
   static uint32_t down_at = 0, last_seen = 0;
   static int32_t x = 0, y = 0;
   static bool have_xy = false, consumed = false;
+  static uint32_t last_tap = 0;  // Lúc nhả lần chạm nhanh trước (0 = không có).
 
   if (touch::pressed()) {
     last_seen = now;
@@ -81,9 +83,17 @@ void handleTouch(uint32_t now) {
   down = false;
   if (consumed) return;
   if (last_seen - down_at < kLongPressMs) {
-    if (!(have_xy && mascot.poke(x, y, now))) mascot.setState(next(mascot.state()), now);
+    // Chạm 1 lần tương tác ngay (không chờ xem có chạm đôi không, cho nhạy); chạm đôi thì đổi biểu cảm thêm.
+    if (last_tap != 0 && now - last_tap < kDoubleTapMs) {
+      mascot.setExpression(next(mascot.expression()), now);
+      last_tap = 0;
+    } else {
+      if (have_xy) mascot.tap(x, y, now);
+      last_tap = now;
+    }
   } else {
-    mascot.setExpression(next(mascot.expression()), now);
+    mascot.setState(next(mascot.state()), now);
+    last_tap = 0;
   }
 }
 
@@ -115,8 +125,18 @@ void setup() {
   Serial.println("[ready] mascot");
 }
 
+// Lệnh thử qua Serial: 'e' biểu cảm tiếp theo, 's' trạng thái tiếp theo (đo fps từng biểu cảm bằng script).
+void handleSerial(uint32_t now) {
+  while (Serial.available() > 0) {
+    int c = Serial.read();
+    if (c == 'e') mascot.setExpression(next(mascot.expression()), now);
+    if (c == 's') mascot.setState(next(mascot.state()), now);
+  }
+}
+
 void loop() {
   uint32_t now = millis();
+  handleSerial(now);
   handleTouch(now);
   updateLed(now);
   mascot.update(now);
