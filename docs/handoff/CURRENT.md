@@ -1,39 +1,40 @@
 ---
 date: 2026-11-16
-branch: main
-commit: 0565c72
+branch: firmware/display-touch
+commit: 23db86f
 ---
 # Handoff
 
 ## Mục tiêu
-Làm trợ lý giọng nói để bàn kiểu Muse Charm trên board ESP32-3248S035R (3.5"). Session này: nhận dạng board, chốt kiến trúc, dựng kho kiến thức (AGENTS.md, docs/, ontology, hook và skill bàn giao). Xong khi session sau mở ra là biết đang ở đâu và làm gì tiếp.
+Hiển thị lên màn board ESP32-3248S035R: màu đúng, chữ, cảm ứng vẽ được. **Đã xong**: người dùng xác nhận màu đúng và cảm ứng "tốt như bản đầu".
 
 ## Trạng thái
-- Xong: AGENTS.md + CLAUDE.md; `docs/hardware/` (pinout, cổng, mic, nguồn, danh sách mua); ADR 0001–0004; `docs/design/assistant.md`; `docs/research/`; `docs/open-questions.md` (Q1–Q10); ontology 23 khái niệm; hook bàn giao chép từ project Black-Room; skill handoff theo mẫu claude-village.
-- Khung đã commit (`9ce7114`), merge fast-forward vào `main` và push lên `origin/main`. Nhánh `setup/knowledge-base` còn ở máy, đã merge, xóa được. `docs/private/` bị git bỏ qua (repo công khai).
-- Chưa có code firmware/server. Chưa mua loa, mic, pin. Chưa cài PlatformIO, esptool.
+- `firmware/` chạy trên board (COM5): màn kiểm tra 4 màu, hiệu chỉnh cảm ứng 4 điểm + kiểm tra 5 điểm, màn chính vẽ tay, nút XOA và CAN CHINH, LED RGB đổi màu.
+- Đã commit trên nhánh `firmware/display-touch` (tách từ `main` ở `23db86f`): `firmware/`, ADR 0005, docs/hardware, open-questions, AGENTS.md, ontology, bàn giao này. Chưa merge vào `main`, chưa push.
+- Bản sao lưu flash gốc: `backups/factory_backup.bin` (git bỏ qua). Đã thử khôi phục một lần, chạy đúng.
+- Công cụ đã cài: esptool 5.6.0, PlatformIO 6.2.0 (pip --user, gọi qua `python -m`).
 
 ## Quyết định
-- Board là 3.5" (người bán ghi nhầm 2.8"): đèn nền GPIO27, ST7796. Chân trống: 21, 22, 35.
-- ADR 0001: board là thin client, server Python ở nhà làm phần nặng.
-- ADR 0002: bộ não đổi được, Muse API hoặc Claude API, luôn bằng API key.
-- ADR 0003: từ đánh thức xử lý trên server, chạm màn là cách dự phòng.
-- ADR 0004: đã loại firmware Muse Gadget SDK (không hỗ trợ board 3.5", không có tiếng nói khi không PSRAM).
-- Đã loại: dùng thẻ SD thay RAM; model từ đánh thức trên chip; đăng nhập claude.ai trong server; combo có MAX98357.
+- ADR 0005: PlatformIO + Arduino + TFT_eSPI cho màn. Cảm ứng tự đọc theo thuật toán LovyanGFX (PENIRQ GPIO36 + trung vị 7 lượt), hiệu chỉnh tự viết lưu NVS khóa `cal_lgfx`.
+- Đã loại, đừng thử lại:
+  - LovyanGFX cho màn: sai màu. Đã thử đảo màu, BGR, B6=0x02, 24-bit, SPI 10MHz, chuỗi khởi tạo LCDwiki; đọc ngược bộ nhớ màn vẫn đúng; chip là ST7796.
+  - `getTouch`/`calibrateTouch` của TFT_eSPI: đứt nét, lệch nửa dưới.
+  - Bộ lọc vá theo lực ấn và cắt đầu/đuôi nét: làm cụt nét mà vẫn có đoạn lạ.
+  - Giữ BOOT lúc khởi động: chip vào chế độ nạp code.
 
 ## Việc tiếp theo
-1. Chờ người dùng: ảnh rõ mã chip 8 chân cạnh `2R2` (Q1), đo bước chân BAT1 (Q2), kiểm tra token Muse có API key không (Q6).
-2. Cài esptool (`pip install esptool`), sao lưu flash gốc: `python -m esptool --port COMx read_flash 0 0x400000 cyd_factory_backup.bin`.
-3. Chốt framework firmware (Q9) bằng ADR 0005, dựng project dò pin trong `firmware/`: màn, đèn nền GPIO27, cảm ứng, LED, loa, ADC GPIO34/35.
+1. Hỏi người dùng có merge `firmware/display-touch` vào `main` và push không.
+2. Bước tiếp của dự án: chọn giữa giao diện linh vật (LVGL hoặc vẽ bằng TFT_eSPI) và thử loa (DAC GPIO26) khi người dùng có loa. Mic, pin, loa chưa mua.
+3. Vẫn chờ người dùng: ảnh rõ mã chip 8 chân cạnh `2R2` (Q1), đo cổng BAT1 (Q2), token Muse có API key không (Q6).
 
 ## Kiểm chứng
-- `python .claude/hooks/test_handoff_hooks.py`: Ran 13 tests, OK.
-- Ontology check với `--md`: `classes=23 relations=13 states=2 enums=2 rules=8 anchors_ok=61 errors=0 warnings=8` (8 cảnh báo: quy tắc chưa có test vì chưa có code).
-- Ontology `--hook`: không in gì, exit 0.
-- `git check-ignore`: `docs/private/accounts.md` bị bỏ qua đúng.
-- Hook trong `.claude/settings.json` chỉ có hiệu lực từ session sau; chưa thấy chúng chạy thật trong một session.
+- `cd firmware && python -m platformio run -e cyd35 -t upload`: SUCCESS.
+- `python firmware/tools/serial_log.py COM5 8`: `[lcd] init ok, 480x320, backlight GPIO27`, `psram 0`, `[ready] home screen`.
+- Log 3 phút sau khi nạp bản cuối: `[touchtest] worst=5px` (5 điểm: 5, 1, 2, 3, 2px), 121 nét vẽ.
+- Người dùng xác nhận bằng mắt: 4 dải màu đúng; cảm ứng "tốt như bản đầu".
+- Ontology check: `errors=0 warnings=7`. `python .claude/hooks/test_handoff_hooks.py`: OK.
 
 ## Rủi ro
-- Phần nguồn (chip sạc, SW1, chân đo pin) suy ra từ linh kiện, chưa có tài liệu.
-- Giá linh kiện và thông tin Muse API lấy từ nguồn thứ cấp.
-- Neo ontology trỏ vào tài liệu; số dòng trong link của `ontology.md` lệch nếu sửa AGENTS.md hay docs (chạy `--resolve` để sửa).
+- `serial_log.py` reset board qua RTS khi mở cổng; khi nó đang chạy thì không nạp được (COM5 bận).
+- Một lần ghi log 2 phút không thu được dòng chạm nào, chưa rõ nguyên nhân (có thể người dùng vẽ trước khi board khởi động lại xong).
+- Chưa rõ vì sao LovyanGFX sai màu (Q11); nếu cần LovyanGFX cho LVGL sau này phải tìm ra.

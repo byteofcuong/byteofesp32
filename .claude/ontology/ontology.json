@@ -1,7 +1,7 @@
 {
   "project": "byteofesp32",
   "generated": "2026-11-16",
-  "commit": "0565c72",
+  "commit": "23db86f",
   "root": "../..",
   "classes": [
     {
@@ -59,9 +59,9 @@
       "synonyms": ["LCD", "ST7796", "màn"],
       "definition": "Màn 480x320 driver ST7796 nối qua SPI; đèn nền bật tắt riêng bằng GPIO27.",
       "attributes": [
-        {"name": "backlight_gpio", "type": "int", "definition": "Chân điều khiển đèn nền; 27 trên board này, 21 trên bản 2.8\".", "evidence": [{"file": "docs/hardware/esp32-3248s035r.md", "symbol": "| Đèn nền LCD | GPIO27 |"}]}
+        {"name": "backlight_gpio", "type": "int", "definition": "Chân điều khiển đèn nền; 27 trên board này, 21 trên bản 2.8\".", "evidence": [{"file": "docs/hardware/esp32-3248s035r.md", "symbol": "| Đèn nền LCD | GPIO27 |"}, {"file": "firmware/platformio.ini", "symbol": "-D TFT_BL=27"}]}
       ],
-      "evidence": [{"file": "docs/hardware/esp32-3248s035r.md", "symbol": "- Màn: driver ST7796, 480x320"}]
+      "evidence": [{"file": "docs/hardware/esp32-3248s035r.md", "symbol": "- Màn: driver ST7796, 480x320"}, {"file": "firmware/platformio.ini", "symbol": "-D ST7796_DRIVER=1"}]
     },
     {
       "id": "TouchPanel",
@@ -70,8 +70,18 @@
       "parent": "Peripheral",
       "label": {"en": "Touch panel", "vi": "Cảm ứng"},
       "synonyms": ["XPT2046", "touch"],
-      "definition": "Lớp cảm ứng điện trở đọc qua chip XPT2046; phải ấn, không đa điểm, cần hiệu chỉnh.",
-      "evidence": [{"file": "docs/hardware/esp32-3248s035r.md", "symbol": "- Cảm ứng: điện trở, chip XPT2046"}]
+      "definition": "Lớp cảm ứng điện trở đọc qua chip XPT2046; phải ấn, không đa điểm, cần hiệu chỉnh. Firmware đọc theo kiểu LovyanGFX: chân PENIRQ báo chạm, trung vị 7 lượt.",
+      "evidence": [{"file": "docs/hardware/esp32-3248s035r.md", "symbol": "- Cảm ứng: điện trở, chip XPT2046"}, {"file": "firmware/src/main.cpp", "symbol": "bool readRawMedian(int32_t* rx, int32_t* ry) {"}]
+    },
+    {
+      "id": "TouchCalibration",
+      "kind": "value",
+      "area": "hardware",
+      "parent": null,
+      "label": {"en": "Touch calibration", "vi": "Hiệu chỉnh cảm ứng"},
+      "synonyms": ["cal", "CAN CHINH", "cal_lgfx (NVS)"],
+      "definition": "Bộ số ánh xạ giá trị thô của XPT2046 sang tọa độ màn hình (trục có bị đổi không, giá trị thô ở 4 điểm cách mép 30px); lưu trong NVS, làm lại bằng nút CAN CHINH.",
+      "evidence": [{"file": "firmware/src/main.cpp", "symbol": "struct TouchCal {"}]
     },
     {
       "id": "Speaker",
@@ -257,6 +267,7 @@
     {"id": "server_uses_provider", "from": "HomeServer", "to": "BrainProvider", "cardinality": "N:1", "definition": "Server gọi đúng một nhà cung cấp tại một thời điểm, chọn bằng cấu hình.", "evidence": [{"file": "docs/decisions/0002-swappable-brain.md", "symbol": "chọn bằng cấu hình"}]},
     {"id": "server_holds_apikey", "from": "HomeServer", "to": "ApiKey", "cardinality": "1:N", "definition": "Server giữ API key của các nhà cung cấp.", "evidence": [{"file": "docs/decisions/0001-thin-client-home-server.md", "symbol": "- API key chỉ nằm trên HomeServer."}]},
     {"id": "turn_handled_by_fastbrain", "from": "Turn", "to": "FastBrain", "cardinality": "N:1", "definition": "Mỗi Turn được FastBrain trả lời.", "evidence": [{"file": "docs/design/assistant.md", "symbol": "3. HomeServer: speech-to-text"}]},
+    {"id": "touchpanel_uses_calibration", "from": "TouchPanel", "to": "TouchCalibration", "cardinality": "1:1", "definition": "Tọa độ thô của cảm ứng chỉ dùng được sau khi áp hiệu chỉnh.", "evidence": [{"file": "firmware/src/main.cpp", "symbol": "void rawToScreen(int32_t rx, int32_t ry, int32_t* x, int32_t* y) {"}]},
     {"id": "slowbrain_runs_task", "from": "SlowBrain", "to": "BackgroundTask", "cardinality": "1:N", "definition": "SlowBrain chạy các việc nền.", "evidence": [{"file": "docs/design/assistant.md", "symbol": "## Việc chạy nền (BackgroundTask)"}]}
   ],
   "states": [
@@ -292,13 +303,14 @@
     {"name": "ActivationMethod", "values": ["touch", "wake_word"], "evidence": [{"file": "docs/decisions/0003-wake-word-on-server.md", "symbol": "Luôn giữ cách kích hoạt dự phòng: chạm màn."}]}
   ],
   "rules": [
-    {"id": "R1", "statement": "Code màn hình dùng cấu hình 3.5\" (ST7796, đèn nền GPIO27); cấu hình 2.8\" làm màn đen.", "applies_to": ["Display", "Board"], "enforced_by": [{"file": "AGENTS.md", "symbol": "Code cho bản 2.8\" làm màn đen"}], "tested_by": []},
+    {"id": "R1", "statement": "Code màn hình dùng cấu hình 3.5\" (ST7796, đèn nền GPIO27); cấu hình 2.8\" làm màn đen.", "applies_to": ["Display", "Board"], "enforced_by": [{"file": "AGENTS.md", "symbol": "Code cho bản 2.8\" làm màn đen"}, {"file": "firmware/platformio.ini", "symbol": "-D TFT_BL=27"}], "tested_by": [{"file": "firmware/src/main.cpp", "symbol": "void showColorBars() {"}]},
     {"id": "R2", "statement": "API key chỉ nằm trên HomeServer, không bao giờ trên Device.", "applies_to": ["ApiKey", "Device", "HomeServer"], "enforced_by": [{"file": "docs/decisions/0001-thin-client-home-server.md", "symbol": "- API key chỉ nằm trên HomeServer."}], "tested_by": []},
     {"id": "R3", "statement": "Mic dùng IO21, IO22, IO35; khi gắn mic thì CN1 không còn dùng cho I2C.", "applies_to": ["Microphone", "Connector"], "enforced_by": [{"file": "docs/hardware/esp32-3248s035r.md", "symbol": "Gắn mic thì hết chân cho cảm biến I2C"}], "tested_by": []},
     {"id": "R4", "statement": "Pin là LiPo 1 cell có mạch bảo vệ; dây đỏ vào BAT+.", "applies_to": ["Battery"], "enforced_by": [{"file": "docs/hardware/esp32-3248s035r.md", "symbol": "Dây đỏ vào `BAT+`"}], "tested_by": []},
     {"id": "R5", "statement": "Sao lưu flash gốc trước lần nạp firmware đầu tiên.", "applies_to": ["Board", "Device"], "enforced_by": [{"file": "AGENTS.md", "symbol": "Trước lần nạp firmware đầu tiên: sao lưu flash gốc"}], "tested_by": []},
     {"id": "R6", "statement": "Không chạy từ đánh thức trên chip; Device stream âm thanh để server nghe.", "applies_to": ["Device", "WakeWordDetection"], "enforced_by": [{"file": "docs/hardware/esp32-3248s035r.md", "symbol": "- Không PSRAM: không chạy được từ đánh thức trên chip"}], "tested_by": []},
     {"id": "R7", "statement": "Server gọi model bằng API key, không bằng đăng nhập gói thuê bao claude.ai.", "applies_to": ["BrainProvider"], "enforced_by": [{"file": "docs/decisions/0002-swappable-brain.md", "symbol": "Không dùng đăng nhập gói thuê bao claude.ai trong server"}], "tested_by": []},
-    {"id": "R8", "statement": "Thông tin tài khoản và gói dịch vụ chỉ ghi vào docs/private (repo công khai).", "applies_to": ["BrainProvider", "ApiKey"], "enforced_by": [{"file": "AGENTS.md", "symbol": "thông tin cá nhân, tài khoản, số dư chỉ ghi vào `docs/private/`"}], "tested_by": []}
+    {"id": "R8", "statement": "Thông tin tài khoản và gói dịch vụ chỉ ghi vào docs/private (repo công khai).", "applies_to": ["BrainProvider", "ApiKey"], "enforced_by": [{"file": "AGENTS.md", "symbol": "thông tin cá nhân, tài khoản, số dư chỉ ghi vào `docs/private/`"}], "tested_by": []},
+    {"id": "R9", "statement": "Màn dùng TFT_eSPI (LovyanGFX sai màu); cảm ứng chỉ coi là chạm khi PENIRQ (GPIO36) ở mức thấp, không dùng getTouch() của TFT_eSPI.", "applies_to": ["Display", "TouchPanel"], "enforced_by": [{"file": "firmware/src/main.cpp", "symbol": "bool pressed() { return digitalRead(board::kTouchIrq) == LOW; }"}, {"file": "AGENTS.md", "symbol": "Màn dùng TFT_eSPI, không dùng LovyanGFX (sai màu)."}], "tested_by": [{"file": "firmware/src/main.cpp", "symbol": "void verifyTouch() {"}]}
   ]
 }
