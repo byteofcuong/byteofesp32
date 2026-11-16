@@ -12,6 +12,7 @@ Trợ lý giọng nói để bàn trên board ESP32-3248S035R. Bước 1 của l
 - `main` đã có và đã push: firmware màn + cảm ứng + linh vật (`firmware/src/main.cpp`, `mascot.*`, `touch.*`), đặc tả và bản mẫu linh vật (`docs/design/mascot/`), ontology.
 - Linh vật: hai mắt robot có **con ngươi khe dọc**, **tai cáo đặc lòng sẫm**, mũi tam giác, miệng ω, màu cam khi rảnh; 5 trạng thái trợ lý, 6 biểu cảm; chuyển động bằng lò xo; 30 fps.
 - Thử trên board: chạm mắt = nháy mắt; chạm chỗ khác = đổi trạng thái; giữ 1 giây = đổi biểu cảm; giữ 5 giây = hiệu chỉnh cảm ứng; để yên 30 giây = ngủ.
+- `AGENTS.md` đã cập nhật trạng thái dự án (trước đó vẫn ghi "chưa có code").
 - Nhánh `firmware/display-touch`, `feature/fox-mascot` còn ở máy, đã merge, xóa được. Sao lưu flash gốc ở `backups/factory_backup.bin` (git bỏ qua).
 
 ## Quyết định
