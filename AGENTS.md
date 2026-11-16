@@ -26,14 +26,14 @@ Trợ lý giọng nói để bàn (kiểu Meta Muse Charm) chạy trên board **
 ## Verification commands
 Shell: Git Bash, chạy từ gốc repo. Chạy ngày 2026-11-16.
 ```
-python -I ~/.claude/skills/ontology/scripts/check_ontology.py .claude/ontology/ontology.json --md .claude/ontology/ontology.md   # errors=0, warnings=7 (quy tắc của server chưa có test vì chưa có server)
+python -I ~/.claude/skills/ontology/scripts/check_ontology.py .claude/ontology/ontology.json --md .claude/ontology/ontology.md   # errors=0, warnings=8 (quy tắc chưa có test tự động)
 python .claude/hooks/test_handoff_hooks.py   # test các hook bàn giao
 ```
 Firmware (chạy từ `firmware/`, cần board cắm COM5 cho hai lệnh sau):
 ```
-python -m platformio run -e cyd35              # SUCCESS, RAM ~6.9%, flash ~24%
+python -m platformio run -e cyd35              # SUCCESS, RAM ~7%, flash ~26%
 python -m platformio run -e cyd35 -t upload    # nạp lên board, SUCCESS
-python tools/serial_log.py COM5 8              # reset board, in log: [lcd] init ok 480x320, [selftest], [ready] home screen
+python tools/serial_log.py COM5 8              # reset board, in log: [lcd] init ok 480x320, [ready] mascot, [mascot] fps≈27–30
 ```
 Chưa có test tự động cho firmware. Phần nhìn (màu, cảm ứng) phải nhờ người dùng xác nhận; cảm ứng có số đo `[touchtest] worst=` sau khi bấm "CAN CHINH". Khi đang ghi log, đừng nạp (cổng COM5 bận).
 

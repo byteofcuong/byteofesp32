@@ -48,7 +48,7 @@ classDiagram
 | Speaker | entity | Loa 8Ω 1–2W ở SPEAK1, tín hiệu DAC GPIO26 | loa | [esp32-3248s035r.md:24](docs/hardware/esp32-3248s035r.md#L24) |
 | Microphone | entity | Mic I2S INMP441 qua CN1 và P3 (chưa mua) | mic | [esp32-3248s035r.md:48](docs/hardware/esp32-3248s035r.md#L48) |
 | Battery | entity | LiPo 3.7V 1 cell có mạch bảo vệ ở BAT1 (chưa mua) | pin | [esp32-3248s035r.md:62](docs/hardware/esp32-3248s035r.md#L62) |
-| TouchCalibration | value | Ánh xạ giá trị thô XPT2046 sang tọa độ màn, lưu NVS, làm lại bằng nút CAN CHINH; sai số đo được 4–5px | cal, cal_lgfx | [main.cpp:28](firmware/src/main.cpp#L28) |
+| TouchCalibration | value | Ánh xạ giá trị thô XPT2046 sang tọa độ màn, lưu NVS, làm lại bằng nút CAN CHINH; sai số đo được 4–5px | cal, cal_lgfx | [touch.cpp:25](firmware/src/touch.cpp#L25) |
 | SdCard | entity | Thẻ microSD ở TF1; lưu âm thanh, hình, log | thẻ nhớ, TF | [esp32-3248s035r.md:23](docs/hardware/esp32-3248s035r.md#L23) |
 | Device | entity | Firmware trên Board: linh vật, chạm, mic, loa; không giữ key | firmware, thin client | [assistant.md:6](docs/design/assistant.md#L6) |
 | HomeServer | entity | Chương trình Python trong mạng nhà làm phần nặng | server, relay | [assistant.md:7](docs/design/assistant.md#L7) |
@@ -57,7 +57,7 @@ classDiagram
 | FastBrain | process | Trả lời ngay trong một Turn | não nhanh | [assistant.md:9](docs/design/assistant.md#L9) |
 | SlowBrain | process | Việc chạy nền, báo kết quả sau | não chậm | [assistant.md:10](docs/design/assistant.md#L10) |
 | Turn | event | Một lần hỏi và trả lời | lượt | [assistant.md:12](docs/design/assistant.md#L12) |
-| Mascot | entity | Nhân vật trên màn thể hiện trạng thái | linh vật, pet | [assistant.md:19](docs/design/assistant.md#L19) |
+| Mascot | entity | Mặt trên màn: hai mắt robot con ngươi khe dọc, tai cáo, mũi, miệng ω | linh vật, mặt cáo | [mascot.hpp:30](firmware/src/mascot.hpp#L30), [spec](docs/design/mascot/spec.md) |
 | BackgroundTask | entity | Việc SlowBrain nhận và báo kết quả | job | [assistant.md:23](docs/design/assistant.md#L23) |
 | WakeWordDetection | process | Server nghe từ đánh thức trong luồng âm thanh | openWakeWord | [0003-wake-word-on-server.md:10](docs/decisions/0003-wake-word-on-server.md#L10) |
 | SpeechToText | process | Đổi giọng nói thành chữ | STT, faster-whisper | [assistant.md:15](docs/design/assistant.md#L15) |
@@ -80,7 +80,7 @@ classDiagram
 | server_holds_apikey | HomeServer → ApiKey | 1:N | `server/.env` |
 | turn_handled_by_fastbrain | Turn → FastBrain | N:1 | Bước 3 của một lượt |
 | slowbrain_runs_task | SlowBrain → BackgroundTask | 1:N | Việc chạy nền |
-| touchpanel_uses_calibration | TouchPanel → TouchCalibration | 1:1 | `rawToScreen()` trong `firmware/src/main.cpp` |
+| touchpanel_uses_calibration | TouchPanel → TouchCalibration | 1:1 | `rawToScreen()` trong `firmware/src/touch.cpp` |
 
 ## 5. Vòng đời
 Mascot.state ([assistant.md:20](docs/design/assistant.md#L20)):
@@ -105,12 +105,12 @@ stateDiagram-v2
   running --> failed : lỗi
 ```
 
-Giá trị khác (enum): `BrainProviderName` = muse, claude; `ActivationMethod` = touch, wake_word.
+Giá trị khác (enum): `BrainProviderName` = muse, claude; `ActivationMethod` = touch, wake_word; `Expression` = neutral, happy, sad, angry, surprised, sleepy ([mascot.hpp:12](firmware/src/mascot.hpp#L12)).
 
 ## 6. Quy tắc
 | ID | Quy tắc | Ghi ở | Test |
 |---|---|---|---|
-| R1 | Dùng cấu hình 3.5" (ST7796, đèn nền GPIO27); cấu hình 2.8" làm màn đen | [AGENTS.md:44](AGENTS.md#L44), `firmware/platformio.ini` | `showColorBars()` lúc khởi động (người dùng nhìn) |
+| R1 | Dùng cấu hình 3.5" (ST7796, đèn nền GPIO27); cấu hình 2.8" làm màn đen | [AGENTS.md:44](AGENTS.md#L44), `firmware/platformio.ini` | Chưa có (người dùng xác nhận màu bằng mắt) |
 | R2 | API key chỉ trên HomeServer, không trên Device | [0001:13](docs/decisions/0001-thin-client-home-server.md#L13) | Chưa có |
 | R3 | Mic dùng IO21/IO22/IO35; gắn mic thì CN1 hết dùng cho I2C | [esp32-3248s035r.md:58](docs/hardware/esp32-3248s035r.md#L58) | Chưa có |
 | R4 | Pin LiPo 1 cell có bảo vệ; dây đỏ vào BAT+ | [esp32-3248s035r.md:36](docs/hardware/esp32-3248s035r.md#L36) | Chưa có |
@@ -118,7 +118,7 @@ Giá trị khác (enum): `BrainProviderName` = muse, claude; `ActivationMethod` 
 | R6 | Không chạy từ đánh thức trên chip; Device stream âm thanh | [esp32-3248s035r.md:66](docs/hardware/esp32-3248s035r.md#L66) | Chưa có |
 | R7 | Server gọi model bằng API key, không bằng đăng nhập claude.ai | [0002:11](docs/decisions/0002-swappable-brain.md#L11) | Chưa có |
 | R8 | Thông tin tài khoản chỉ ở docs/private | [AGENTS.md:48](AGENTS.md#L48) | Chưa có |
-| R9 | Màn dùng TFT_eSPI; cảm ứng chỉ coi là chạm khi PENIRQ (GPIO36) thấp, không dùng `getTouch()` của TFT_eSPI | [main.cpp:35](firmware/src/main.cpp#L35), [AGENTS.md:45](AGENTS.md#L45) | `verifyTouch()` in `[touchtest] worst=` (bán tự động, cần người chạm) |
+| R9 | Màn dùng TFT_eSPI; cảm ứng chỉ coi là chạm khi PENIRQ (GPIO36) thấp, không dùng `getTouch()` của TFT_eSPI | [touch.cpp:122](firmware/src/touch.cpp#L122), [AGENTS.md:45](AGENTS.md#L45) | `touch::verify()` in `[touchtest] worst=` (bán tự động, cần người chạm) |
 
 ## 7. Phát hiện
 - Tên gọi trôi: người bán gọi board là "2.8 inch"; nghiên cứu ban đầu dùng "CYD ESP32-2432S028R"; đúng là ESP32-3248S035R. Mọi tài liệu mới dùng tên đúng.

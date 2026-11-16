@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mắt robot: bản mẫu</title>
+<style>
+  body { margin: 0; background: #1a1d23; color: #e6e6e6; font: 14px system-ui, sans-serif; }
+  main { max-width: 1000px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 18px; font-weight: 500; margin: 0 0 12px; }
+  h2 { font-size: 15px; font-weight: 500; margin: 20px 0 8px; color: #9aa0a6; }
+  .screen { display: block; width: 480px; max-width: 100%; aspect-ratio: 3 / 2; background: #000; border-radius: 8px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+  .cell { background: #000; border-radius: 8px; padding: 0 0 6px; }
+  .cell svg { display: block; width: 100%; aspect-ratio: 3 / 2; }
+  .cell p { margin: 2px 10px 0; color: #9aa0a6; font-size: 12px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+  button { background: #2a2e36; color: #e6e6e6; border: 1px solid #3a3f48; border-radius: 6px; padding: 6px 10px; font: inherit; cursor: pointer; }
+  button.on { border-color: #5EE7F2; color: #5EE7F2; }
+</style>
+</head>
+<body>
+<main>
+<h1>Mắt robot nâng cấp: bản mẫu (màn 480x320)</h1>
+<svg class="screen" id="live" viewBox="0 0 480 320"></svg>
+<div class="controls" id="exprBtns"></div>
+<div class="controls" id="stateBtns"></div>
+<h2>So sánh kiểu tai và con ngươi</h2>
+<div class="grid" id="foxGrid" style="grid-template-columns: repeat(4, 1fr)"></div>
+<h2>Biểu cảm (đứng yên)</h2>
+<div class="grid" id="exprGrid"></div>
+<h2>Trạng thái trợ lý</h2>
+<div class="grid" id="stateGrid"></div>
+</main>
+<script>
+// Thông số: xem docs/design/mascot/spec.md. Chỉ dùng hình firmware vẽ được:
+// hình chữ nhật bo góc, elip, tam giác, đường cong bậc hai nét tròn.
+const COL = { bg: "#000", eye: "#5EE7F2", hi: "#FFFFFF", blush: "#FF7EB3",
+  state: { idle: "#5EE7F2", listening: "#6EF2A6", thinking: "#B79BFF", speaking: "#5EE7F2", notifying: "#FFD25E" } };
+const CX = 240;
+const EYE_DX = 78, EYE_Y = 140;           // Hai mắt cách tâm 78px, tâm mắt y = 140 (chừa chỗ cho tai).
+const MOUTH_Y = 236;
+
+// Hình dạng theo biểu cảm. Mọi giá trị đều nội suy được để biến hình mượt.
+//  w,h,r: kích thước mắt; lid: phần mí che từ trên (0..0.6); slope: độ nghiêng mí (+ trễ ra ngoài, - trễ vào trong);
+//  cut: phần cắt từ dưới thành mắt cười (0..0.55); dy: dịch cả khuôn mặt; mw, mc, mo: miệng rộng, độ cong (+ cười), độ mở; blush.
+const SHAPES = {
+  neutral:   { w: 86, h: 104, r: 30, lid: 0,    slope: 0,    cut: 0,    dy: 0,  mw: 34, mc: 6,   mo: 0,   blush: 0 },
+  happy:     { w: 92, h: 100, r: 34, lid: 0,    slope: 0,    cut: 0.36, dy: -6, mw: 52, mc: 10,  mo: 0.3,  blush: 1 },
+  sad:       { w: 84, h: 92,  r: 30, lid: 0.32, slope: 0.5,  cut: 0,    dy: 8,  mw: 32, mc: -10, mo: 0,   blush: 0 },
+  angry:     { w: 88, h: 96,  r: 26, lid: 0.32, slope: -0.55, cut: 0,   dy: 2,  mw: 30, mc: -4,  mo: 0,   blush: 0 },
+  surprised: { w: 98, h: 112, r: 49, lid: 0,    slope: 0,    cut: 0,    dy: -4, mw: 16, mc: 0,   mo: 0.9, blush: 0 },
+  sleepy:    { w: 90, h: 104, r: 30, lid: 0.58, slope: 0.1,  cut: 0,    dy: 6,  mw: 20, mc: 2,   mo: 0,   blush: 0 },
+};
+const EXPRS = Object.keys(SHAPES);
+// Tư thế tai: góc nghiêng nhẹ (≤ 8°) + độ ép thấp (squash < 1 = cụp). Xoay mạnh làm góc chân tai
+// phía trong thành mũi nhọn mới, tai trông như nút "play" (đã thử 28° và 16°).
+const EAR_POSE = { neutral: [0, 1], happy: [-4, 1.05], sad: [8, 0.7], angry: [6, 0.82], surprised: [-6, 1.08], sleepy: [6, 0.78] };
+Object.keys(SHAPES).forEach(k => { SHAPES[k].ear = EAR_POSE[k][0]; SHAPES[k].earSq = EAR_POSE[k][1]; });
+
+// Mức "độ cáo": 0 = mắt robot gốc; 1 = tai cáo + mũi + miệng ω (màu xanh); 2 = như 1 nhưng màu cam khi rảnh/nói.
+let FOX = 2;
+const WARM = "#FF9A3C";
+// Tai trái: tam giác bo tròn (nét viền) to và nhọn kiểu cáo (tai nhỏ trông như mèo);
+// chân tai cách đỉnh mắt ≥ 10px; trục xoay ở giữa chân tai.
+// Chóp tai lệch ra ngoài chừng 20px so với giữa chân tai (lệch nhiều hơn trông như lá cờ).
+const EAR_PTS = [[94, 82], [192, 62], [124, 4]], EAR_PIVOT = [143, 72];
+
+function roundedPoly(pts, r) {
+  const n = pts.length, seg = [];
+  for (let i = 0; i < n; i++) {
+    const p = pts[i], a = pts[(i - 1 + n) % n], b = pts[(i + 1) % n];
+    const da = Math.hypot(a[0] - p[0], a[1] - p[1]), db = Math.hypot(b[0] - p[0], b[1] - p[1]);
+    const ra = Math.min(r, da / 2), rb = Math.min(r, db / 2);
+    seg.push({ p1: [p[0] + (a[0] - p[0]) * ra / da, p[1] + (a[1] - p[1]) * ra / da], p,
+               p2: [p[0] + (b[0] - p[0]) * rb / db, p[1] + (b[1] - p[1]) * rb / db] });
+  }
+  let d = `M${seg[0].p2[0].toFixed(1)} ${seg[0].p2[1].toFixed(1)}`;
+  for (let i = 1; i <= n; i++) { const s = seg[i % n];
+    d += ` L${s.p1[0].toFixed(1)} ${s.p1[1].toFixed(1)} Q${s.p[0]} ${s.p[1]} ${s.p2[0].toFixed(1)} ${s.p2[1].toFixed(1)}`; }
+  return d + "Z";
+}
+
+// Kiểu tai: "outline" = tam giác viền (bản trước, người dùng chê "không giống tai");
+// "solid" = khối đặc, cạnh ngoài cong phồng, cạnh trong hơi lõm, lòng tai khoét màu nền.
+let EAR_STYLE = "solid";
+// Con ngươi dọc kiểu mắt cáo: dấu hiệu riêng (robot màn hình như Cozmo/Vector/EMO đều mắt trơn).
+let PUPIL = true;
+// Độ rộng con ngươi theo biểu cảm (tỉ lệ bề rộng mắt): khe hẹp khi bình thường, nở tròn khi ngạc nhiên.
+const PUPIL_W = { neutral: 0.14, happy: 0.2, sad: 0.24, angry: 0.09, surprised: 0.36, sleepy: 0.14 };
+Object.keys(SHAPES).forEach(k => SHAPES[k].pw = PUPIL_W[k]);
+
+// Tai đặc: B1 chân ngoài, B2 chân trong, T chóp. Cạnh ngoài phồng ra, cạnh trong lõm nhẹ.
+function solidEarPath(B1, B2, T, side) {
+  const bulge = (a, b, k) => {
+    const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2, dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy);
+    return [mx - dy / L * k * side, my + dx / L * k * side];  // Lệch vuông góc khỏi dây cung.
+  };
+  const c1 = bulge(B1, T, 14), c2 = bulge(T, B2, -6);
+  return `M${B1[0]} ${B1[1]} Q${c1[0].toFixed(1)} ${c1[1].toFixed(1)} ${T[0]} ${T[1]} Q${c2[0].toFixed(1)} ${c2[1].toFixed(1)} ${B2[0]} ${B2[1]} Q${(B1[0] + B2[0]) / 2} ${(B1[1] + B2[1]) / 2 + 10} ${B1[0]} ${B1[1]} Z`;
+}
+
+function earsSvg(angle, squash, dx, dy, color) {
+  let s = "";
+  [-1, 1].forEach(side => {
+    const pts = side < 0 ? EAR_PTS : EAR_PTS.map(([x, y]) => [2 * CX - x, y]);
+    const px = side < 0 ? EAR_PIVOT[0] : 2 * CX - EAR_PIVOT[0], py = EAR_PIVOT[1];
+    const a = side < 0 ? -angle : angle;
+    s += `<g transform="translate(${dx.toFixed(1)} ${dy.toFixed(1)}) translate(${px} ${py}) rotate(${a.toFixed(1)}) scale(1 ${squash.toFixed(3)}) translate(${-px} ${-py})">`;
+    if (EAR_STYLE === "outline") {
+      s += `<path d="${roundedPoly(pts, 10)}" fill="${color}" fill-opacity="0.16" stroke="${color}" stroke-width="7" stroke-linejoin="round"/>`;
+    } else {
+      // Khối tai đặc bo tròn; lòng tai tô sẫm (phủ màu nền 45%), KHÔNG khoét đen
+      // (khoét đen làm tai thành hai vệt cong như sừng, đã thử).
+      const [B1, B2, T] = pts;
+      s += `<path d="${roundedPoly(pts, 12)}" fill="${color}"/>`;
+      const c = [(B1[0] + B2[0] + T[0]) / 3, (B1[1] + B2[1] + T[1]) / 3 + 10];
+      const sh = q => [c[0] + (q[0] - c[0]) * 0.55, c[1] + (q[1] - c[1]) * 0.55];
+      s += `<path d="${roundedPoly([sh(B1), sh(B2), sh(T)], 7)}" fill="${COL.bg}" opacity="0.45"/>`;
+    }
+    s += `</g>`;
+  });
+  return s;
+}
+
+// Mũi tam giác + miệng chữ ω (mặt thú). Cười thì ω cong sâu, buồn thì lật ngược.
+function foxMouthSvg(cx, y, p, talk, color) {
+  const ny = y - 22;
+  let s = `<path d="${roundedPoly([[cx - 10, ny - 6], [cx + 10, ny - 6], [cx, ny + 5]], 4)}" fill="${color}"/>`;
+  const open = Math.max(talk, p.mw < 26 ? p.mo : 0);
+  if (open > 0.05) {
+    // Miệng chữ O không có nét nhân trung (dính vào nhau trông như lỗ khóa).
+    if (p.mw < 26) return s + `<ellipse cx="${cx}" cy="${y + 6}" rx="${(7 + open * 4).toFixed(1)}" ry="${(6 + open * 8).toFixed(1)}" fill="${color}"/>`;
+    s += `<path d="M${cx} ${ny + 5} L${cx} ${y - 8}" stroke="${color}" stroke-width="4" stroke-linecap="round"/>`;
+    const d = 6 + open * 16, yb = y - 6 + d / 0.75;
+    return s + `<path d="M${cx - 16} ${y - 6} Q${cx} ${y - 2} ${cx + 16} ${y - 6} C${cx + 16} ${yb.toFixed(1)} ${cx - 16} ${yb.toFixed(1)} ${cx - 16} ${y - 6} Z" fill="${color}"/>`;
+  }
+  const c = 3 + p.mc * 0.6, j = y - 8, wing = 9 + Math.max(0, p.mc) * 0.35;
+  s += `<path d="M${cx} ${ny + 5} L${cx} ${j}" stroke="${color}" stroke-width="4" stroke-linecap="round"/>`;
+  s += `<path d="M${cx - wing * 2} ${j + 1} Q${cx - wing} ${j + 1 + c * 2} ${cx} ${j} Q${cx + wing} ${j + 1 + c * 2} ${cx + wing * 2} ${j + 1}" fill="none" stroke="${color}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`;
+  return s;
+}
+
+const STATES = ["idle", "listening", "thinking", "speaking", "notifying"];
+
+// Một mắt. side: -1 trái, 1 phải. p: thông số đã nội suy. open: 0 nhắm .. 1 mở. scale: phối cảnh khi liếc.
+function eyeSvg(cx, cy, side, p, open, scale, color) {
+  let w = p.w * scale * (1 + 0.14 * (1 - open));       // Nhắm thì bè ngang (co giãn giữ thể tích).
+  let h = Math.max(7, p.h * scale * open);
+  const r = Math.min(p.r * scale, h / 2, w / 2);
+  const x0 = cx - w / 2, y0 = cy - h / 2;
+  let s = `<rect x="${x0.toFixed(1)}" y="${y0.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="${r.toFixed(1)}" fill="${color}"/>`;
+  // Con ngươi dọc: viên thuốc màu nền, cao 62% mắt, rộng theo biểu cảm; dịch theo hướng nhìn (gaze) trong mắt.
+  // Khe elip mảnh, cao ~60% mắt, hơi thấp (khe chữ nhật cao 62% trông như chữ số "0", đã thử).
+  if (PUPIL && open > 0.3 && p.cut < 0.2) {
+    const rx = Math.max(3.5, w * p.pw / 2), ry = h * 0.3;
+    const pcx = cx + (p.gx || 0) * w * 0.14, pcy = cy + h * 0.07 + (p.gy || 0) * h * 0.08;
+    s += `<ellipse cx="${pcx.toFixed(1)}" cy="${pcy.toFixed(1)}" rx="${rx.toFixed(1)}" ry="${ry.toFixed(1)}" fill="${COL.bg}"/>`;
+  }
+  // Đốm sáng vẽ TRƯỚC mí và phần khoét, để mí che được (trước đây vẽ sau nên lơ lửng ngoài mắt).
+  // Không có đốm sáng khi mắt cười (cut) hoặc mí che quá nửa (ngái ngủ).
+  const hiAlpha = Math.max(0, Math.min(1, (open - 0.55) / 0.3)) * Math.max(0, 1 - p.cut * 5) * (p.lid > 0.45 ? 0 : 1);
+  if (hiAlpha > 0.02) {
+    s += `<circle cx="${(cx + w * 0.2).toFixed(1)}" cy="${(y0 + h * 0.27).toFixed(1)}" r="${(w * 0.11).toFixed(1)}" fill="${COL.hi}" opacity="${(0.95 * hiAlpha).toFixed(2)}"/>`;
+    s += `<circle cx="${(cx - w * 0.18).toFixed(1)}" cy="${(y0 + h * 0.7).toFixed(1)}" r="${(w * 0.05).toFixed(1)}" fill="${COL.hi}" opacity="${(0.7 * hiAlpha).toFixed(2)}"/>`;
+  }
+  if (open > 0.35) {
+    // Mí trên: tam giác/hình thang màu nền che phía trên, nghiêng theo slope (ra ngoài = phía side).
+    if (p.lid > 0.01) {
+      const base = y0 + h * p.lid, tilt = h * 0.32 * p.slope;
+      const yOut = base + tilt, yIn = base - tilt;
+      const xOut = cx + side * (w / 2 + 3), xIn = cx - side * (w / 2 + 3);
+      s += `<polygon points="${xIn},${y0 - 3} ${xOut},${y0 - 3} ${xOut},${yOut.toFixed(1)} ${xIn},${yIn.toFixed(1)}" fill="${COL.bg}"/>`;
+    }
+    // Mắt cười: elip màu nền khoét từ dưới lên; đỉnh elip ở y0 + h*(1 - 1.6*cut).
+    // cut 0.36 chừa lại vòm dày ~42% chiều cao (0.5 trước đây chỉ còn sợi mảnh).
+    if (p.cut > 0.01) {
+      const ry = h * 0.62, top = y0 + h * (1 - 1.6 * p.cut);
+      // rx gần bằng bề rộng mắt để vòm thon dần về hai đầu (0.7 làm hai bên thẳng như mũ bảo hiểm).
+      s += `<ellipse cx="${cx}" cy="${(top + ry).toFixed(1)}" rx="${(w * 0.98).toFixed(1)}" ry="${ry.toFixed(1)}" fill="${COL.bg}"/>`;
+    }
+  }
+  return s;
+}
+
+// Miệng: đường cong bậc hai nét tròn; khi mở thì thành hình kín (hai đường cong).
+function mouthSvg(cx, y, p, talk, color) {
+  const mw = p.mw, half = mw / 2, mc = p.mc, open = Math.max(p.mo, talk);
+  if (open > 0.05 && mw < 26) {
+    // Miệng nhỏ mở (ngạc nhiên): hình chữ O.
+    return `<ellipse cx="${cx}" cy="${y + 4}" rx="${(8 + open * 4).toFixed(1)}" ry="${(6 + open * 9).toFixed(1)}" fill="${color}"/>`;
+  }
+  if (open > 0.05) {
+    // Miệng mở hình chữ U/D: mép trên cong nhẹ (bậc hai), đáy tròn (bậc ba, hai điểm điều khiển
+    // thẳng dưới hai khóe miệng nên đáy bằng, không nhọn như phễu). Đáy sâu ≈ 0.75 * độ lệch điểm điều khiển.
+    const top = mc * 0.3, depth = 8 + open * 20;
+    const w2 = Math.max(half, 18), yb = y + top + depth / 0.75;
+    return `<path d="M${cx - w2} ${y} Q${cx} ${y + top * 2} ${cx + w2} ${y} C${cx + w2} ${yb.toFixed(1)} ${cx - w2} ${yb.toFixed(1)} ${cx - w2} ${y} Z" fill="${color}"/>`;
+  }
+  return `<path d="M${cx - half} ${y} Q${cx} ${y + mc} ${cx + half} ${y}" fill="none" stroke="${color}" stroke-width="8" stroke-linecap="round"/>`;
+}
+
+// Chi tiết theo trạng thái, giữ từ bản đầu: sóng âm, ba chấm, lấp lánh, chữ z.
+function extrasSvg(state, t, asleep, color, cy) {
+  let s = "";
+  if (asleep) {
+    for (let k = 0; k < 3; k++) {
+      const ph = (t * 0.35 + k / 3) % 1, a = Math.sin(ph * Math.PI);
+      s += `<text x="${396 + ph * 34}" y="${118 - ph * 84}" fill="#9AA4B2" opacity="${a.toFixed(2)}" font-family="system-ui" font-weight="600" font-size="${14 + ph * 14}">z</text>`;
+    }
+    return s;
+  }
+  if (state === "listening") {
+    for (let k = 0; k < 3; k++) {
+      const h = 14 + 34 * Math.abs(Math.sin(t * 6.5 + k * 1.1)) * (0.6 + 0.4 * Math.sin(t * 1.7 + k));
+      [[46 - k * 13], [434 + k * 13]].forEach(([x]) =>
+        s += `<rect x="${x - 3.5}" y="${(cy - h / 2).toFixed(1)}" width="7" height="${h.toFixed(1)}" rx="3.5" fill="${color}" opacity="${(0.9 - k * 0.22).toFixed(2)}"/>`);
+    }
+  }
+  if (state === "thinking") {
+    for (let k = 0; k < 3; k++) {
+      const ph = Math.max(0, Math.sin(t * 4.2 - k * 0.8));
+      s += `<circle cx="${388 + k * 20}" cy="${46 - ph * 6}" r="${(5 + ph * 2.5).toFixed(1)}" fill="${color}" opacity="${(0.45 + 0.55 * ph).toFixed(2)}"/>`;
+    }
+  }
+  if (state === "notifying") {
+    const pts = [[64, 52], [420, 60], [72, 250], [412, 244]];
+    pts.forEach(([x, y], k) => {
+      const v = Math.max(0, Math.sin(t * 3.2 + k * 1.6)), r = 4 + v * 9;
+      s += `<path d="M${x} ${y - r} Q${x} ${y} ${x + r} ${y} Q${x} ${y} ${x} ${y + r} Q${x} ${y} ${x - r} ${y} Q${x} ${y} ${x} ${y - r} Z" fill="${color}" opacity="${v.toFixed(2)}"/>`;
+    });
+  }
+  return s;
+}
+
+// Vẽ khung. f: { p (thông số), gx, gy, openL, openR, tilt, bob, state, t, talk, asleep }
+function render(f) {
+  const fox = f.fox ?? FOX;
+  let color = f.asleep ? "#5B6B7A" : COL.state[f.state];
+  if (fox >= 2 && !f.asleep && (f.state === "idle" || f.state === "speaking")) color = WARM;
+  let p = f.p, cy = EYE_Y + p.dy + f.bob;
+  // (Đã thử mắt xếch: làm mặt cau có, ghép với mắt cười thành hình vây cá mập. Bỏ.)
+  let s = `<rect width="480" height="320" fill="${COL.bg}"/>`;
+  const gx = f.gx * 22, gy = f.gy * 14;
+  if (fox >= 1) s += earsSvg(p.ear + (f.earKick || 0), p.earSq, gx * 0.35, p.dy + f.bob + gy * 0.3, color);
+  // (Đã thử túm lông má: trông như mũi tên « ». Bỏ.)
+  // Phối cảnh: liếc sang bên nào thì mắt bên đó to hơn chút.
+  const sL = 1 - 0.07 * f.gx, sR = 1 + 0.07 * f.gx;
+  if (p.blush > 0.02) {
+    [[CX - EYE_DX - 18], [CX + EYE_DX + 18]].forEach(([bx]) =>
+      s += `<ellipse cx="${bx + gx * 0.6}" cy="${cy + 64 + gy * 0.5}" rx="20" ry="9" fill="${COL.blush}" opacity="${(0.55 * p.blush).toFixed(2)}"/>`);
+  }
+  const pe = { ...p, gx: f.gx, gy: f.gy };  // Con ngươi đi theo hướng nhìn.
+  s += eyeSvg(CX - EYE_DX + gx, cy + gy - f.tilt, -1, pe, f.openL, sL, color);
+  s += eyeSvg(CX + EYE_DX + gx, cy + gy + f.tilt, 1, pe, f.openR, sR, color);
+  const my = MOUTH_Y + p.dy + f.bob + gy * 0.4;
+  s += fox >= 1 ? foxMouthSvg(CX + gx * 0.5, my, p, f.talk, color) : mouthSvg(CX + gx * 0.5, my, p, f.talk, color);
+  s += extrasSvg(f.state, f.t, f.asleep, color, cy);
+  return s;
+}
+
+// ---- Bản xem tĩnh ----
+const base = { gx: 0, gy: 0, openL: 1, openR: 1, tilt: 0, bob: 0, t: 1.0, talk: 0, asleep: false };
+// So sánh: kiểu tai x con ngươi.
+document.getElementById("foxGrid").innerHTML = [["outline", false], ["solid", false], ["solid", true]].map(([es, pu]) =>
+  ["neutral", "happy", "sad", "surprised"].map(e => {
+    const keepE = EAR_STYLE, keepP = PUPIL; EAR_STYLE = es; PUPIL = pu;
+    const svg = render({ ...base, p: SHAPES[e], state: "idle" }); EAR_STYLE = keepE; PUPIL = keepP;
+    return `<div class="cell"><svg viewBox="0 0 480 320">${svg}</svg><p>tai ${es}${pu ? " + con ngươi" : ""} · ${e}</p></div>`;
+  }).join("")).join("");
+document.getElementById("exprGrid").innerHTML = EXPRS.map(e =>
+  `<div class="cell"><svg viewBox="0 0 480 320">${render({ ...base, p: SHAPES[e], state: "idle", asleep: e === "sleepy" })}</svg><p>${e}</p></div>`).join("");
+document.getElementById("stateGrid").innerHTML = STATES.map(st =>
+  `<div class="cell"><svg viewBox="0 0 480 320">${render({ ...base, p: SHAPES[st === "notifying" ? "happy" : "neutral"], state: st, talk: st === "speaking" ? 0.6 : 0, gx: st === "thinking" ? 0.6 : 0, gy: st === "thinking" ? -0.6 : 0 })}</svg><p>${st}</p></div>`).join("");
+
+// ---- Bản chạy ----
+const live = document.getElementById("live");
+const spring = x => ({ x, v: 0 });
+const step = (s, target, k, c, dt) => { s.v += (k * (target - s.x) - c * s.v) * dt; s.x += s.v * dt; };
+const keys = Object.keys(SHAPES.neutral);
+const P = Object.fromEntries(keys.map(k => [k, spring(SHAPES.neutral[k])]));
+const gx = spring(0), gy = spring(0), tilt = spring(0), bob = spring(0), earK = spring(0);
+let nextTwitch = 4;
+let expr = "neutral", state = "idle", tgx = 0, tgy = 0, tTilt = 0, nextLook = 1, nextTilt = 6, nextBlink = 2;
+let blinkAt = -1, dbl = false, winkEye = -1, lastInteract = 0, last = performance.now() / 1000, t0 = last;
+
+function blinkOpen(t) {
+  if (blinkAt < 0 || t < blinkAt) return 1;
+  const d = t - blinkAt;
+  if (d < 0.07) return 1 - (d / 0.07);
+  if (d < 0.2) return 1 - Math.pow(1 - (d - 0.07) / 0.13, 3);
+  if (dbl) { dbl = false; blinkAt = t + 0.09; }
+  else { blinkAt = -1; winkEye = -1; }
+  return 1;
+}
+function frame(ms) {
+  const now = ms / 1000, dt = Math.min(1 / 30, now - last); last = now;
+  const t = now - t0, asleep = state === "idle" && expr === "neutral" && t - lastInteract > 30;
+  const targetExpr = asleep ? "sleepy" : state === "notifying" ? "happy" : expr;
+  // Liếc mắt theo trạng thái.
+  if (t > nextLook) {
+    if (state === "thinking") { tgx = 0.55 + Math.random() * 0.3; tgy = -0.55 - Math.random() * 0.3; }
+    else if (state === "listening") { tgx = (Math.random() - 0.5) * 0.3; tgy = -0.1; }
+    else if (asleep) { tgx = 0; tgy = 0.3; }
+    else { tgx = (Math.random() * 2 - 1) * 0.9; tgy = (Math.random() * 2 - 1) * 0.6; if (Math.random() < 0.3) { tgx = 0; tgy = 0; } }
+    if (!asleep && Math.abs(tgx - gx.x) > 0.8 && blinkAt < 0) blinkAt = t;  // Liếc xa thì chớp.
+    nextLook = t + 0.9 + Math.random() * 2.4;
+  }
+  // Nghiêng đầu tò mò thỉnh thoảng.
+  if (t > nextTilt) { tTilt = tTilt ? 0 : (Math.random() < 0.5 ? -1 : 1) * 7; nextTilt = t + (tTilt ? 1.6 : 6 + Math.random() * 6); }
+  if (blinkAt < 0 && t > nextBlink && !asleep) { blinkAt = t; dbl = Math.random() < 0.2; nextBlink = t + 2.6 + Math.random() * 2.6; }
+  const S = SHAPES[targetExpr];
+  keys.forEach(k => step(P[k], S[k], 170, 22, dt));
+  step(gx, tgx, 320, 30, dt); step(gy, tgy, 320, 30, dt);
+  step(tilt, asleep ? 0 : tTilt, 60, 11, dt); step(bob, 0, 160, 9, dt);
+  // Giật tai khi rảnh: hích lò xo, tai nảy ra rồi rung về.
+  if (!asleep && state === "idle" && t > nextTwitch) { earK.v += 160; nextTwitch = t + 4 + Math.random() * 6; }
+  step(earK, state === "listening" ? -5 : 0, 260, 9, dt);  // Nghe: tai hơi dựng về phía trước.
+  const p = Object.fromEntries(keys.map(k => [k, P[k].x]));
+  const o = blinkOpen(t);
+  const breath = Math.sin(t * 2 * Math.PI / (asleep ? 6 : 4)) * (asleep ? 4 : 2);
+  const talk = state === "speaking" ? Math.abs(Math.sin(t * 9) * 0.6 + Math.sin(t * 23) * 0.4) : 0;
+  live.innerHTML = render({ p, gx: gx.x, gy: gy.x, openL: winkEye === 1 ? 1 : o, openR: winkEye === 0 ? 1 : o,
+    earKick: earK.x, tilt: tilt.x, bob: bob.x + breath + (state === "notifying" ? -Math.abs(Math.sin(t * 5)) * 8 : 0), state, t, talk, asleep });
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+// Bấm vào màn: nháy một mắt và nảy lên.
+live.addEventListener("pointerdown", () => { const t = performance.now() / 1000 - t0; lastInteract = t; winkEye = Math.random() < 0.5 ? 0 : 1; blinkAt = t; dbl = false; bob.v -= 260; });
+
+function buttons(id, list, get, set) {
+  const el = document.getElementById(id);
+  const draw = () => el.innerHTML = list.map(v => `<button class="${v === get() ? "on" : ""}" data-v="${v}">${v}</button>`).join("");
+  el.addEventListener("click", e => { if (e.target.dataset.v) { set(e.target.dataset.v); lastInteract = performance.now() / 1000 - t0; draw(); } });
+  draw();
+}
+buttons("exprBtns", EXPRS, () => expr, v => expr = v);
+buttons("stateBtns", STATES, () => state, v => state = v);
+</script>
+</body>
+</html>
