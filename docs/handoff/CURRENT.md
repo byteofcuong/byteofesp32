@@ -23,7 +23,7 @@ Hiển thị lên màn board ESP32-3248S035R: màu đúng, chữ, cảm ứng v�
   - Giữ BOOT lúc khởi động: chip vào chế độ nạp code.
 
 ## Việc tiếp theo
-1. Hỏi người dùng có merge `firmware/display-touch` vào `main` và push không.
+1. Hỏi người dùng có merge `firmware/display-touch` vào `main` và push không. Quy ước commit mới (AGENTS.md): một câu tiếng Anh, không dấu vết AI. Hai commit đã push lên `main` (`9ce7114`, `23db86f`) còn message tiếng Việt kèm `Co-Authored-By`: sửa lại cần force push, chờ người dùng quyết.
 2. Bước tiếp của dự án: chọn giữa giao diện linh vật (LVGL hoặc vẽ bằng TFT_eSPI) và thử loa (DAC GPIO26) khi người dùng có loa. Mic, pin, loa chưa mua.
 3. Vẫn chờ người dùng: ảnh rõ mã chip 8 chân cạnh `2R2` (Q1), đo cổng BAT1 (Q2), token Muse có API key không (Q6).
 

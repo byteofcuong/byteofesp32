@@ -48,6 +48,7 @@ Một thay đổi xong khi các lệnh kiểm chứng ở trên đã chạy lạ
 - Repo công khai trên GitHub: thông tin cá nhân, tài khoản, số dư chỉ ghi vào `docs/private/`.
 - Khi hướng dẫn phần cứng cho người dùng: nêu chữ in trên board, cắm hay hàn, và cực pin.
 - Trả lời người dùng bằng tiếng Việt, thuật ngữ kỹ thuật giữ tiếng Anh.
+- Commit message: một câu tiếng Anh ngắn, chuyên nghiệp, dạng mệnh lệnh (ví dụ "Add display and touch firmware"). Không có phần thân, không có dòng `Co-Authored-By` hay bất kỳ dấu vết nào của AI.
 
 ## Cuối session
 Chạy skill `handoff`: chuyển bản cũ vào `docs/handoff/archive/`, viết `docs/handoff/CURRENT.md` mới; cập nhật phần cứng, ADR, open questions, ontology nếu có thay đổi.
