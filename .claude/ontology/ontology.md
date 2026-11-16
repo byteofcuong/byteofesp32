@@ -1,7 +1,7 @@
 # Ontology: byteofesp32
 
 ## 1. Phạm vi
-- Ngày: 2026-11-16, commit `23db86f` + firmware đầu tiên (chưa commit). Màn, cảm ứng và hiệu chỉnh đã neo vào `firmware/`; phần trợ lý (Device, HomeServer, Brain) vẫn neo vào tài liệu thiết kế và ADR.
+- Ngày: 2026-11-16, commit `d8f55bf` (firmware đầu tiên). Màn, cảm ứng và hiệu chỉnh đã neo vào `firmware/`; phần trợ lý (Device, HomeServer, Brain) vẫn neo vào tài liệu thiết kế và ADR.
 - Hai vùng: `hardware` (board và linh kiện), `system` (trợ lý: Device, HomeServer, Brain).
 - Kiểm tra lại (Git Bash, từ gốc repo):
   ```

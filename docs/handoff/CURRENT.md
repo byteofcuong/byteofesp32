@@ -1,7 +1,7 @@
 ---
 date: 2026-11-16
 branch: firmware/display-touch
-commit: 23db86f
+commit: dd1768b
 ---
 # Handoff
 
@@ -10,7 +10,7 @@ Hiển thị lên màn board ESP32-3248S035R: màu đúng, chữ, cảm ứng v�
 
 ## Trạng thái
 - `firmware/` chạy trên board (COM5): màn kiểm tra 4 màu, hiệu chỉnh cảm ứng 4 điểm + kiểm tra 5 điểm, màn chính vẽ tay, nút XOA và CAN CHINH, LED RGB đổi màu.
-- Đã commit trên nhánh `firmware/display-touch` (tách từ `main` ở `23db86f`): `firmware/`, ADR 0005, docs/hardware, open-questions, AGENTS.md, ontology, bàn giao này. Chưa merge vào `main`, chưa push.
+- Đã commit trên nhánh `firmware/display-touch` (tách từ `main` ở `76dc465`): `firmware/`, ADR 0005, docs/hardware, open-questions, AGENTS.md, ontology, bàn giao này. Chưa merge vào `main`, chưa push.
 - Bản sao lưu flash gốc: `backups/factory_backup.bin` (git bỏ qua). Đã thử khôi phục một lần, chạy đúng.
 - Công cụ đã cài: esptool 5.6.0, PlatformIO 6.2.0 (pip --user, gọi qua `python -m`).
 
@@ -23,7 +23,7 @@ Hiển thị lên màn board ESP32-3248S035R: màu đúng, chữ, cảm ứng v�
   - Giữ BOOT lúc khởi động: chip vào chế độ nạp code.
 
 ## Việc tiếp theo
-1. Hỏi người dùng có merge `firmware/display-touch` vào `main` và push không. Quy ước commit mới (AGENTS.md): một câu tiếng Anh, không dấu vết AI. Hai commit đã push lên `main` (`9ce7114`, `23db86f`) còn message tiếng Việt kèm `Co-Authored-By`: sửa lại cần force push, chờ người dùng quyết.
+1. Hỏi người dùng có merge `firmware/display-touch` vào `main` và push không. Quy ước commit (AGENTS.md): một câu tiếng Anh, không dấu vết AI. Lịch sử `main` đã được viết lại theo quy ước và force push (2026-11-16, `main` = `76dc465`); bản sao cũ của git nằm ở `refs/original/` trên máy.
 2. Bước tiếp của dự án: chọn giữa giao diện linh vật (LVGL hoặc vẽ bằng TFT_eSPI) và thử loa (DAC GPIO26) khi người dùng có loa. Mic, pin, loa chưa mua.
 3. Vẫn chờ người dùng: ảnh rõ mã chip 8 chân cạnh `2R2` (Q1), đo cổng BAT1 (Q2), token Muse có API key không (Q6).
 
