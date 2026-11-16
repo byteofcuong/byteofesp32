@@ -1,7 +1,7 @@
 ---
 date: 2026-11-16
-branch: firmware/display-touch
-commit: dd1768b
+branch: main
+commit: b862af7
 ---
 # Handoff
 
@@ -10,7 +10,7 @@ Hiển thị lên màn board ESP32-3248S035R: màu đúng, chữ, cảm ứng v�
 
 ## Trạng thái
 - `firmware/` chạy trên board (COM5): màn kiểm tra 4 màu, hiệu chỉnh cảm ứng 4 điểm + kiểm tra 5 điểm, màn chính vẽ tay, nút XOA và CAN CHINH, LED RGB đổi màu.
-- Đã commit trên nhánh `firmware/display-touch` (tách từ `main` ở `76dc465`): `firmware/`, ADR 0005, docs/hardware, open-questions, AGENTS.md, ontology, bàn giao này. Chưa merge vào `main`, chưa push.
+- Toàn bộ firmware, ADR 0005, docs, ontology đã merge vào `main` và push lên GitHub. Nhánh `firmware/display-touch` còn ở máy, đã merge, xóa được.
 - Bản sao lưu flash gốc: `backups/factory_backup.bin` (git bỏ qua). Đã thử khôi phục một lần, chạy đúng.
 - Công cụ đã cài: esptool 5.6.0, PlatformIO 6.2.0 (pip --user, gọi qua `python -m`).
 
@@ -23,9 +23,8 @@ Hiển thị lên màn board ESP32-3248S035R: màu đúng, chữ, cảm ứng v�
   - Giữ BOOT lúc khởi động: chip vào chế độ nạp code.
 
 ## Việc tiếp theo
-1. Hỏi người dùng có merge `firmware/display-touch` vào `main` và push không. Quy ước commit (AGENTS.md): một câu tiếng Anh, không dấu vết AI. Lịch sử `main` đã được viết lại theo quy ước và force push (2026-11-16, `main` = `76dc465`); bản sao cũ của git nằm ở `refs/original/` trên máy.
-2. Bước tiếp của dự án: chọn giữa giao diện linh vật (LVGL hoặc vẽ bằng TFT_eSPI) và thử loa (DAC GPIO26) khi người dùng có loa. Mic, pin, loa chưa mua.
-3. Vẫn chờ người dùng: ảnh rõ mã chip 8 chân cạnh `2R2` (Q1), đo cổng BAT1 (Q2), token Muse có API key không (Q6).
+1. Bước tiếp của dự án: chọn giữa giao diện linh vật (LVGL hoặc vẽ bằng TFT_eSPI) và thử loa (DAC GPIO26) khi người dùng có loa. Mic, pin, loa chưa mua.
+2. Vẫn chờ người dùng: ảnh rõ mã chip 8 chân cạnh `2R2` (Q1), đo cổng BAT1 (Q2), token Muse có API key không (Q6).
 
 ## Kiểm chứng
 - `cd firmware && python -m platformio run -e cyd35 -t upload`: SUCCESS.
@@ -35,6 +34,7 @@ Hiển thị lên màn board ESP32-3248S035R: màu đúng, chữ, cảm ứng v�
 - Ontology check: `errors=0 warnings=7`. `python .claude/hooks/test_handoff_hooks.py`: OK.
 
 ## Rủi ro
+- Lịch sử `main` đã viết lại và force push ngày 2026-11-16 để commit message theo quy ước (một câu tiếng Anh, không dấu vết AI). Bản sao lịch sử cũ ở `refs/original/` trên máy, không có trên GitHub.
 - `serial_log.py` reset board qua RTS khi mở cổng; khi nó đang chạy thì không nạp được (COM5 bận).
 - Một lần ghi log 2 phút không thu được dòng chạm nào, chưa rõ nguyên nhân (có thể người dùng vẽ trước khi board khởi động lại xong).
 - Chưa rõ vì sao LovyanGFX sai màu (Q11); nếu cần LovyanGFX cho LVGL sau này phải tìm ra.
